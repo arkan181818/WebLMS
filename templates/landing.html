@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Selamat Datang{% endblock %}
+
+{% block guest_content %}
+<div style="min-height: 100vh; background: #ffffff;">
+    <!-- Public Navbar -->
+    <header style="border-bottom: 1px solid var(--border-color); padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="brand-logo">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <div>
+                <h2 style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0;">RuangBelajar</h2>
+                <span style="font-size: 11px; color: #64748b;">Learning Management System</span>
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <a href="{{ url_for('login') }}" class="btn btn-outline btn-sm">Masuk</a>
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Daftar Akun</a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-badge">
+            <i class="fas fa-sparkles"></i> Platform Pembelajaran Modern & Interaktif
+        </div>
+        <h1 class="hero-title">
+            Tingkatkan Pemahaman Belajar dengan <span>Materi Terstruktur</span>
+        </h1>
+        <p class="hero-desc">
+            Akses ribuan materi pelajaran, video tutorial terpadu, unduhan modul belajar, dan lacak progres belajar Anda secara real-time.
+        </p>
+
+        <div class="hero-cta">
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-user-plus"></i> Mulai Belajar Sekarang
+            </a>
+            <a href="{{ url_for('login') }}" class="btn btn-outline btn-lg">
+                <i class="fas fa-sign-in-alt"></i> Masuk Akun
+            </a>
+        </div>
+
+
+    </section>
+
+    <!-- Mata Pelajaran Highlights -->
+    <section style="max-width: 1200px; margin: 40px auto 80px; padding: 0 24px;">
+        <div style="text-align: center; margin-bottom: 36px;">
+            <h3 style="font-size: 24px; font-weight: 800; color: #0f172a;">Kategori & Mata Pelajaran</h3>
+            <p style="color: #64748b; font-size: 14px;">Materi terkurasi yang siap dipelajari kapan pun dan di mana pun.</p>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+            {% for s in subjects %}
+                <div class="card card-hover" style="border-top: 4px solid var(--primary);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <div class="stat-icon" style="width: 42px; height: 42px; font-size: 18px;">
+                            <i class="fas fa-bookmark"></i>
+                        </div>
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 700; color: #0f172a;">{{ s.name }}</h4>
+                            <span class="badge badge-indigo">{{ s.code or 'KURSUS' }}</span>
+                        </div>
+                    </div>
+                    <p style="font-size: 13px; color: #64748b; line-height: 1.5;">{{ s.description or 'Materi pelajaran berkualitas tinggi.' }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

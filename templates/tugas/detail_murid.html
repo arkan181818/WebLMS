@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Tugas: {{ assignment.title }}{% endblock %}
+{% block page_title %}{{ assignment.subject.name }}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; margin-bottom: 24px;">
+    <a href="{{ url_for('tugas_list') }}"><i class="fas fa-clipboard-list"></i> Daftar Tugas</a>
+    <span>/</span>
+    <span style="color: var(--text-main); font-weight: 600;">{{ assignment.title }}</span>
+</div>
+
+<div class="reading-layout">
+    <!-- Kolom Utama: Instruksi & Penjelasan Tugas -->
+    <article class="reading-main">
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 24px; margin-bottom: 28px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <span class="badge badge-indigo" style="font-size: 13px; padding: 6px 14px;">
+                    <i class="fas fa-book"></i> {{ assignment.subject.name }}
+                </span>
+
+                {% if submission %}
+                    {% if submission.is_graded %}
+                        <span class="badge badge-done" style="font-size: 13px; padding: 6px 14px;">
+                            <i class="fas fa-star"></i> Dinilai: {{ submission.grade }}/100
+                        </span>
+                    {% else %}
+                        <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 13px; padding: 6px 14px;">
+                            <i class="fas fa-check-circle"></i> Sudah Dikumpulkan
+                        </span>
+                    {% endif %}
+                {% else %}
+                    {% if assignment.is_past_due %}
+                        <span class="badge" style="background: #fee2e2; color: #991b1b; font-size: 13px; padding: 6px 14px;">
+                            <i class="fas fa-exclamation-circle"></i> Lewat Batas Waktu
+                        </span>
+                    {% else %}
+                        <span class="badge badge-pending" style="font-size: 13px; padding: 6px 14px;">
+                            <i class="far fa-clock"></i> Belum Dikumpulkan
+                        </span>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <h1 style="font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1.3; margin-bottom: 16px;">
+                {{ assignment.title }}
+            </h1>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; font-size: 13px; color: #64748b;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="user-avatar-sm guru" style="width: 32px; height: 32px; font-size: 12px;">
+                        {{ assignment.teacher.display_name[0] | upper }}
+                    </div>
+                    <div>
+                        <strong style="color: var(--text-main);">{{ assignment.teacher.display_name }}</strong>
+                        <span style="display: block; font-size: 11px;">Guru Pengampu</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <span><i class="far fa-calendar-alt"></i> Dibuat: {{ assignment.created_at.strftime('%d %b %Y') }}</span>
+                    <span><i class="fas fa-hourglass-half"></i> Deadline: <strong>{{ assignment.due_date.strftime('%d %b %Y, %H:%M') if assignment.due_date else 'Tanpa Batas' }}</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lampiran Berkas Soal Guru (Jika Ada) -->
+        {% if assignment.attachment_filename %}
+        <div class="attachment-card">
+            <div class="attachment-meta">
+                <div class="attachment-icon">
+                    <i class="fas fa-file-download"></i>
+                </div>
+                <div>
+                    <h5 style="font-size: 14px; font-weight: 700; color: #0f172a; margin: 0;">
+                        {{ assignment.attachment_original_name or 'Berkas Lampiran Soal' }}
+                    </h5>
+                    <span style="font-size: 12px; color: #64748b;">Unduh dokumen panduan/soal tugas yang dilampirkan oleh guru.</span>
+                </div>
+            </div>
+            <a href="{{ url_for('download_file', filename=assignment.attachment_filename) }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-download"></i> Unduh Berkas
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Instruksi Pengerjaan Tugas -->
+        <div style="margin-top: 20px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-list-check" style="color: var(--primary);"></i> Instruksi & Petunjuk Pengerjaan:
+            </h3>
+            <div class="materi-content">
+                {{ assignment.description | format_content | safe }}
+            </div>
+        </div>
+
+        <!-- Hasil Penilaian Guru (Jika Sudah Dinilai) -->
+        {% if submission and submission.is_graded %}
+        <div style="margin-top: 36px; padding: 24px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1.5px solid #86efac; border-radius: var(--radius-lg);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 15px; font-weight: 800; color: #166534; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-award" style="font-size: 20px;"></i> Hasil Penilaian Guru
+                </div>
+                <div style="font-size: 28px; font-weight: 800; color: #15803d;">
+                    {{ submission.grade }} <span style="font-size: 16px; font-weight: 600; color: #166534;">/ 100</span>
+                </div>
+            </div>
+            
+            {% if submission.feedback %}
+            <div style="background: white; padding: 14px 18px; border-radius: var(--radius-md); border: 1px solid #bbf7d0; font-size: 14px; color: #1e293b;">
+                <strong>Catatan Pengajar:</strong><br>
+                <p style="margin-top: 4px; color: #334155; line-height: 1.5;">{{ submission.feedback }}</p>
+            </div>
+            {% endif %}
+            <div style="font-size: 11px; color: #166534; margin-top: 8px; text-align: right;">
+                Dinilai pada: {{ submission.graded_at.strftime('%d %b %Y, %H:%M') if submission.graded_at else '-' }}
+            </div>
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Sidebar: Form Pengumpulan Tugas Murid (Semua Format File) -->
+    <aside class="reading-sidebar">
+        <div class="card" style="border-top: 4px solid {% if submission %}var(--success){% else %}var(--primary){% endif %};">
+            <h4 style="font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-upload" style="color: var(--primary);"></i>
+                {{ 'Status Pengumpulan Tugas' if submission else 'Kumpulkan Tugas' }}
+            </h4>
+            <p style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
+                Mendukung semua jenis berkas (PDF, DOCX, ZIP, RAR, Gambar, Script, dll).
+            </p>
+
+            {% if submission %}
+            <!-- Info Pengumpulan Sebelumnya -->
+            <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-bottom: 18px;">
+                <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 4px;">
+                    Berkas Terkumpul:
+                </div>
+                <div style="font-size: 13px; font-weight: 700; color: #0f172a; word-break: break-all; margin-bottom: 6px;">
+                    <i class="fas fa-file" style="color: var(--primary);"></i> {{ submission.file_original_name }}
+                </div>
+                <div style="font-size: 11px; color: #64748b; margin-bottom: 10px;">
+                    Waktu kirim: {{ submission.submitted_at.strftime('%d %b %Y, %H:%M') }}
+                    {% if submission.is_late %}
+                        <span style="color: #dc2626; font-weight: 700;">(Terlambat)</span>
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('download_file', filename=submission.file_filename) }}" class="btn btn-outline btn-sm" style="width: 100%;">
+                    <i class="fas fa-download"></i> Unduh File Kiriman Anda
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- Form Upload Tugas -->
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('kumpul_tugas', id=assignment.id) }}">
+                <div class="form-group">
+                    <label class="form-label" for="submission_file" style="font-size: 13px;">
+                        {{ 'Unggah Ulang Berkas Baru (Opsional)' if submission else 'Pilih Berkas Tugas' }} <span class="required">*</span>
+                    </label>
+                    <input type="file" id="submission_file" name="submission_file" class="form-control" {% if not submission %}required{% endif %}>
+                    <div id="file-chosen-name" style="display: none; font-size: 11px; color: #166534; margin-top: 4px; font-weight: 600;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="note" style="font-size: 13px;">Catatan Tambahan untuk Guru</label>
+                    <textarea id="note" name="note" class="form-control" rows="3" placeholder="Tuliskan catatan pengerjaan jika ada...">{{ submission.note if submission else '' }}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+                    <i class="fas {{ 'fa-sync-alt' if submission else 'fa-paper-plane' }}"></i>
+                    {{ 'Perbarui / Kirim Ulang Tugas' if submission else 'Kumpulkan Tugas Sekarang' }}
+                </button>
+            </form>
+        </div>
+    </aside>
+</div>
+{% endblock %}

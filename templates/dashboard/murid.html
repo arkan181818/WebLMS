@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Murid{% endblock %}
+{% block page_title %}Dashboard Murid{% endblock %}
+
+{% block content %}
+<!-- Welcome & Progress Banner -->
+<div style="background: linear-gradient(135deg, #312e81 0%, #4338ca 100%); border-radius: var(--radius-xl); padding: 28px 32px; color: white; margin-bottom: 28px; box-shadow: var(--shadow-md);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+        <div>
+            <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #bae6fd; margin-bottom: 8px;">
+                <i class="fas fa-graduation-cap"></i> Ruang Belajar Siswa
+            </span>
+            <h2 style="font-size: 24px; font-weight: 800; margin-top: 4px; color: white;">Semangat Belajar, {{ current_user.display_name }}! 🚀</h2>
+            <p style="color: #e0e7ff; font-size: 14px; margin-top: 4px;">Lanjutkan petualangan belajarmu dan selesaikan semua modul hari ini.</p>
+        </div>
+        
+        <div style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(8px); border-radius: var(--radius-lg); padding: 16px 24px; border: 1px solid rgba(255, 255, 255, 0.2); min-width: 260px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #bae6fd;">Progres Belajar</span>
+                <span style="font-size: 16px; font-weight: 800; color: #ffffff;">{{ progress_percentage }}%</span>
+            </div>
+            <div class="progress-bar-container" style="background: rgba(255, 255, 255, 0.2); height: 10px;">
+                <div class="progress-bar-fill" style="width: {{ progress_percentage }}%; background: #38bdf8;"></div>
+            </div>
+            <div style="font-size: 11px; color: #cbd5e1; margin-top: 6px;">
+                {{ completed_count }} dari {{ total_materials }} materi telah terselesaikan
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stats-grid">
+    <div class="stat-card primary">
+        <div class="stat-icon">
+            <i class="fas fa-book-reader"></i>
+        </div>
+        <div class="stat-info">
+            <h4>Materi Selesai</h4>
+            <div class="stat-value">{{ completed_count }} <span style="font-size: 16px; color: #64748b;">/ {{ total_materials }}</span></div>
+        </div>
+    </div>
+
+    <div class="stat-card success">
+        <div class="stat-icon">
+            <i class="fas fa-clipboard-check"></i>
+        </div>
+        <div class="stat-info">
+            <h4>Tugas Terkumpul</h4>
+            <div class="stat-value">{{ submitted_tasks_count }} <span style="font-size: 16px; color: #64748b;">/ {{ total_assignments }}</span></div>
+        </div>
+    </div>
+
+    <div class="stat-card warning">
+        <div class="stat-icon">
+            <i class="fas fa-star"></i>
+        </div>
+        <div class="stat-info">
+            <h4>Tugas Dinilai</h4>
+            <div class="stat-value">{{ graded_tasks_count }}</div>
+        </div>
+    </div>
+
+    <div class="stat-card accent">
+        <div class="stat-icon">
+            <i class="fas fa-layer-group"></i>
+        </div>
+        <div class="stat-info">
+            <h4>Mata Pelajaran</h4>
+            <div class="stat-value">{{ subjects|length }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tugas yang Perlu Dikerjakan Banner / Section -->
+{% if active_assignments %}
+<div style="margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-clipboard-list" style="color: var(--primary);"></i>
+            Tugas & Evaluasi Pembelajaran
+        </h3>
+        <a href="{{ url_for('tugas_list') }}" class="btn btn-outline btn-sm">Lihat Semua Tugas</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+        {% for a in active_assignments %}
+        {% set s_sub = user_submissions_map.get(a.id) %}
+        <div class="card card-hover" style="padding: 18px 20px; border-left: 4px solid {% if s_sub and s_sub.is_graded %}var(--success){% elif s_sub %}var(--secondary){% else %}var(--warning){% endif %};">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="badge badge-indigo" style="font-size: 11px;">{{ a.subject.name }}</span>
+                {% if s_sub %}
+                    {% if s_sub.is_graded %}
+                        <span class="badge badge-done" style="font-size: 10px;"><i class="fas fa-star"></i> {{ s_sub.grade }}/100</span>
+                    {% else %}
+                        <span class="badge badge-blue" style="font-size: 10px;"><i class="fas fa-check"></i> Terkumpul</span>
+                    {% endif %}
+                {% else %}
+                    <span class="badge badge-amber" style="font-size: 10px;"><i class="far fa-clock"></i> Belum Selesai</span>
+                {% endif %}
+            </div>
+
+            <h4 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px; line-height: 1.3;">
+                <a href="{{ url_for('tugas_detail', id=a.id) }}" style="color: inherit;">{{ a.title }}</a>
+            </h4>
+
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
+                Deadline: <strong>{{ a.due_date.strftime('%d %b, %H:%M') if a.due_date else 'Tanpa Batas' }}</strong>
+            </div>
+
+            <a href="{{ url_for('tugas_detail', id=a.id) }}" class="btn {% if s_sub %}btn-outline{% else %}btn-primary{% endif %} btn-sm" style="width: 100%;">
+                {{ 'Lihat Pengumpulan' if s_sub else 'Kerjakan & Unggah Berkas' }}
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Kategori Mata Pelajaran -->
+<div style="margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-shapes" style="color: var(--primary);"></i>
+            Kategori Pelajaran
+        </h3>
+        <a href="{{ url_for('materi_list') }}" class="btn btn-outline btn-sm">Semua Pelajaran</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+        {% for s in subjects %}
+        <a href="{{ url_for('materi_list', subject_id=s.id) }}" class="card card-hover" style="padding: 16px 20px; text-decoration: none; border-left: 4px solid var(--primary);">
+            <div style="font-weight: 700; color: #0f172a; font-size: 14px; margin-bottom: 4px;">{{ s.name }}</div>
+            <div style="font-size: 12px; color: #64748b;">{{ s.materials|length }} Materi Pembelajaran</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Materi Terbaru -->
+<div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-fire" style="color: var(--warning);"></i>
+            Materi Pembelajaran Pilihan
+        </h3>
+        <a href="{{ url_for('materi_list') }}" class="btn btn-primary btn-sm">Jelajahi Semua</a>
+    </div>
+
+    <div class="materials-grid">
+        {% for m in latest_materials %}
+        <div class="material-card">
+            <div class="material-card-body">
+                <div class="material-card-meta">
+                    <span class="badge badge-indigo">{{ m.subject.name }}</span>
+                    {% if m.id in completed_ids %}
+                        <span class="badge badge-done"><i class="fas fa-check"></i> Selesai</span>
+                    {% else %}
+                        <span class="badge badge-pending"><i class="far fa-clock"></i> Belum</span>
+                    {% endif %}
+                </div>
+
+                <h4 class="material-card-title">
+                    <a href="{{ url_for('materi_detail', id=m.id) }}">{{ m.title }}</a>
+                </h4>
+
+                <p class="material-card-summary">{{ m.summary or m.content[:140] ~ '...' }}</p>
+            </div>
+
+            <div class="material-card-footer">
+                <div class="author-chip">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>{{ m.author.display_name }}</span>
+                </div>
+                <a href="{{ url_for('materi_detail', id=m.id) }}" class="btn btn-primary btn-sm">
+                    Pelajari <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

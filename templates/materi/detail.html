@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}{{ material.title }}{% endblock %}
+{% block page_title %}{{ material.subject.name }}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Navigation -->
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; margin-bottom: 24px;">
+    <a href="{{ url_for('materi_list') }}"><i class="fas fa-home"></i> Katalog Materi</a>
+    <span>/</span>
+    <a href="{{ url_for('materi_list', subject_id=material.subject_id) }}">{{ material.subject.name }}</a>
+    <span>/</span>
+    <span style="color: var(--text-main); font-weight: 600;">{{ material.title }}</span>
+</div>
+
+<div class="reading-layout">
+    <!-- Main Reading Column -->
+    <article class="reading-main">
+        <!-- Header Info -->
+        <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 24px; margin-bottom: 28px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <span class="badge badge-indigo" style="font-size: 13px; padding: 6px 14px;">
+                    <i class="fas fa-folder-open"></i> {{ material.subject.name }}
+                </span>
+
+                {% if current_user.role == 'murid' %}
+                    {% if progress and progress.is_completed %}
+                        <span id="statusBadge" class="badge badge-done" style="font-size: 13px; padding: 6px 14px;">
+                            <i class="fas fa-check"></i> Sudah Selesai
+                        </span>
+                    {% else %}
+                        <span id="statusBadge" class="badge badge-pending" style="font-size: 13px; padding: 6px 14px;">
+                            <i class="far fa-clock"></i> Belum Selesai
+                        </span>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <h1 style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1.3; margin-bottom: 16px;">
+                {{ material.title }}
+            </h1>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; font-size: 13px; color: #64748b;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="user-avatar-sm" style="width: 32px; height: 32px; font-size: 12px; background: linear-gradient(135deg, #4f46e5, #8b5cf6);">
+                        {{ material.author.display_name[0] | upper }}
+                    </div>
+                    <div>
+                        <strong style="color: var(--text-main);">{{ material.author.display_name }}</strong>
+                        <span style="display: block; font-size: 11px;">Pengajar / Guru</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <span><i class="far fa-calendar-alt"></i> {{ material.created_at.strftime('%d %B %Y') }}</span>
+                    {% if material.updated_at != material.created_at %}
+                        <span><i class="fas fa-history"></i> Diperbarui: {{ material.updated_at.strftime('%d %b %Y') }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Player (If Available) -->
+        {% if youtube_embed_url %}
+        <div style="margin-bottom: 28px;">
+            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                <i class="fab fa-youtube" style="color: #ef4444; font-size: 18px;"></i> Video Pembelajaran Interaktif
+            </div>
+            <div class="video-container">
+                <iframe src="{{ youtube_embed_url }}" title="{{ material.title }}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Ringkasan / Summary -->
+        {% if material.summary %}
+        <div style="background: #f8fafc; border-left: 4px solid var(--primary); padding: 16px 20px; border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-bottom: 28px;">
+            <h4 style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary); margin-bottom: 4px;">
+                Ringkasan Materi:
+            </h4>
+            <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0;">{{ material.summary }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Konten Materi Utama (Formatted) -->
+        <div class="materi-content">
+            {{ material.content | format_content | safe }}
+        </div>
+
+        <!-- Lampiran Berkas (If Available) -->
+        {% if material.attachment_filename %}
+        <div class="attachment-card">
+            <div class="attachment-meta">
+                <div class="attachment-icon">
+                    <i class="fas fa-file-pdf"></i>
+                </div>
+                <div>
+                    <h5 style="font-size: 14px; font-weight: 700; color: #0f172a; margin: 0;">
+                        {{ material.attachment_original_name or 'Dokumen Lampiran Materi' }}
+                    </h5>
+                    <span style="font-size: 12px; color: #64748b;">Klik unduh untuk menyimpan berkas materi ke perangkat Anda.</span>
+                </div>
+            </div>
+            <a href="{{ url_for('download_file', filename=material.attachment_filename) }}" class="btn btn-outline btn-sm">
+                <i class="fas fa-download"></i> Unduh Berkas
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Tombol Aksi Murid (Tandai Selesai) -->
+        {% if current_user.role == 'murid' %}
+        <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <h4 style="font-size: 16px; font-weight: 700; color: #0f172a;">Sudah selesai membaca materi ini?</h4>
+                <p style="font-size: 13px; color: #64748b;">Tandai sebagai selesai untuk memperbarui progres belajar Anda.</p>
+            </div>
+
+            <button type="button" id="btnToggleComplete" data-material-id="{{ material.id }}" 
+                    class="btn {% if progress and progress.is_completed %}btn-success{% else %}btn-outline{% endif %} btn-lg">
+                {% if progress and progress.is_completed %}
+                    <i class="fas fa-check-circle"></i> Selesai Dipelajari
+                {% else %}
+                    <i class="far fa-circle"></i> Tandai Sudah Selesai
+                {% endif %}
+            </button>
+        </div>
+        {% endif %}
+
+        <!-- Opsi Guru / Admin -->
+        {% if current_user.is_teacher %}
+        <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 13px; color: #64748b;">
+                <i class="fas fa-user-shield"></i> Anda melihat materi ini sebagai <strong>Pengajar / Admin</strong>.
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('edit_materi', id=material.id) }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-edit"></i> Edit Materi
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Sidebar Informasi Tambahan -->
+    <aside class="reading-sidebar">
+        <!-- Kotak Info Mata Pelajaran -->
+        <div class="card">
+            <h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 12px;">
+                Mata Pelajaran
+            </h4>
+            <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">{{ material.subject.name }}</h3>
+            <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 16px;">{{ material.subject.description or 'Kumpulan materi terstruktur.' }}</p>
+            <a href="{{ url_for('materi_list', subject_id=material.subject_id) }}" class="btn btn-outline btn-sm" style="width: 100%;">
+                Lihat Semua Materi Topik Ini
+            </a>
+        </div>
+
+        <!-- Materi Terkait Lainnya -->
+        <div class="card">
+            <h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 16px;">
+                Materi Terkait
+            </h4>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                {% for rm in related_materials %}
+                <a href="{{ url_for('materi_detail', id=rm.id) }}" style="display: block; padding: 10px 12px; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border-light); text-decoration: none;">
+                    <div style="font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.3; margin-bottom: 4px;">{{ rm.title }}</div>
+                    <span style="font-size: 11px; color: #64748b;">Oleh {{ rm.author.display_name }}</span>
+                </a>
+                {% else %}
+                <span style="font-size: 13px; color: #94a3b8;">Tidak ada materi terkait lainnya.</span>
+                {% endfor %}
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}
