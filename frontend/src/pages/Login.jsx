@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GraduationCap, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import api from '../lib/api';
 
 export default function Login({ onLogin }) {
   const [searchParams] = useSearchParams();
@@ -32,7 +32,7 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await axios.post('/api/login', { identifier, password });
+      const res = await api.post('/api/login', { identifier, password });
       if (res.data.success) {
         toast.success(res.data.message);
         onLogin();
@@ -52,7 +52,7 @@ export default function Login({ onLogin }) {
     }
     setIsLoading(true);
     try {
-      const res = await axios.post('/api/register', {
+      const res = await api.post('/api/register', {
         username: regUsername,
         email: regEmail,
         full_name: regFullName,

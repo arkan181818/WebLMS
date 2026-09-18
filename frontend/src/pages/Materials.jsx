@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { BookOpen, Plus, ChevronRight, CheckCircle, Circle, X, Save, Eye } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -27,7 +27,7 @@ export default function Materials({ user, onLogout }) {
 
   const fetchMaterials = async () => {
     try {
-      const res = await axios.get('/api/materials');
+      const res = await api.get('/api/materials');
       setMaterials(res.data);
     } catch (err) {
       toast.error('Gagal memuat materi');
@@ -38,7 +38,7 @@ export default function Materials({ user, onLogout }) {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get('/api/subjects');
+      const res = await api.get('/api/subjects');
       setSubjects(res.data);
     } catch (err) { /* ignore */ }
   };
@@ -46,7 +46,7 @@ export default function Materials({ user, onLogout }) {
   const openDetail = async (id) => {
     setDetailLoading(true);
     try {
-      const res = await axios.get(`/api/materials/${id}`);
+      const res = await api.get(`/api/materials/${id}`);
       setSelectedMaterial(res.data);
     } catch (err) {
       toast.error('Gagal memuat detail materi');
@@ -57,7 +57,7 @@ export default function Materials({ user, onLogout }) {
 
   const toggleComplete = async (id) => {
     try {
-      const res = await axios.post(`/api/materials/${id}/toggle`);
+      const res = await api.post(`/api/materials/${id}/toggle`);
       setSelectedMaterial(prev => ({ ...prev, is_completed: res.data.is_completed }));
       setMaterials(prev => prev.map(m => m.id === id ? { ...m, is_completed: res.data.is_completed } : m));
       toast.success(res.data.is_completed ? 'Materi ditandai selesai!' : 'Status materi dibatalkan.');
@@ -70,7 +70,7 @@ export default function Materials({ user, onLogout }) {
     e.preventDefault();
     if (!formSubjectId) { toast.error('Pilih mata pelajaran'); return; }
     try {
-      await axios.post('/api/materials/create', {
+      await api.post('/api/materials/create', {
         title: formTitle,
         summary: formSummary,
         content: formContent,

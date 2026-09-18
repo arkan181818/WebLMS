@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { PenTool, Plus, X, Save, Upload, Clock, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -27,7 +27,7 @@ export default function Assignments({ user, onLogout }) {
 
   const fetchAssignments = async () => {
     try {
-      const res = await axios.get('/api/assignments');
+      const res = await api.get('/api/assignments');
       setAssignments(res.data);
     } catch (err) {
       toast.error('Gagal memuat tugas');
@@ -38,7 +38,7 @@ export default function Assignments({ user, onLogout }) {
 
   const fetchSubjects = async () => {
     try {
-      const res = await axios.get('/api/subjects');
+      const res = await api.get('/api/subjects');
       setSubjects(res.data);
     } catch (err) { /* ignore */ }
   };
@@ -46,7 +46,7 @@ export default function Assignments({ user, onLogout }) {
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/assignments/create', {
+      await api.post('/api/assignments/create', {
         title: formTitle,
         description: formDesc,
         subject_id: formSubjectId,
@@ -72,7 +72,7 @@ export default function Assignments({ user, onLogout }) {
     formData.append('file', uploadFile);
     formData.append('note', uploadNote);
     try {
-      await axios.post(`/api/assignments/${assignmentId}/submit`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(`/api/assignments/${assignmentId}/submit`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Tugas berhasil dikirim ke mentor!');
       setSelectedAssignment(null);
       setUploadFile(null);

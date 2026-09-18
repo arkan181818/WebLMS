@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 import { Users, BookOpen, Layers, Target, Clock } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
@@ -14,7 +14,7 @@ export default function Dashboard({ user, onLogout }) {
 
   const fetchDashboard = async () => {
     try {
-      const res = await axios.get('/api/dashboard');
+      const res = await api.get('/api/dashboard');
       setData(res.data);
     } catch (err) {
       console.error(err);

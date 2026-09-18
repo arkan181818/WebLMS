@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { MessageCircle, Send, User as UserIcon } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -32,11 +32,11 @@ export default function Chat({ user, onLogout }) {
   const fetchContacts = async () => {
     try {
       if (user.role === 'guru') {
-        const res = await axios.get('/api/users/students');
+        const res = await api.get('/api/users/students');
         setContacts(res.data);
       } else {
         // Murid: cukup chat ke guru (kita ambil daftar guru)
-        const res = await axios.get('/api/users/teachers');
+        const res = await api.get('/api/users/teachers');
         setContacts(res.data);
       }
     } catch (err) {
@@ -48,7 +48,7 @@ export default function Chat({ user, onLogout }) {
 
   const fetchMessages = async (contactId) => {
     try {
-      const res = await axios.get(`/api/chat/${contactId}`);
+      const res = await api.get(`/api/chat/${contactId}`);
       setMessages(res.data);
     } catch (err) { /* silent */ }
   };
@@ -57,7 +57,7 @@ export default function Chat({ user, onLogout }) {
     e.preventDefault();
     if (!newMessage.trim() || !selectedContact) return;
     try {
-      await axios.post(`/api/chat/${selectedContact.id}`, { content: newMessage });
+      await api.post(`/api/chat/${selectedContact.id}`, { content: newMessage });
       setNewMessage('');
       fetchMessages(selectedContact.id);
     } catch (err) {

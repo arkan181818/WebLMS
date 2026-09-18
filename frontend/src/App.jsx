@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from './lib/api';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -9,8 +9,6 @@ import Mentees from './pages/Mentees';
 import Materials from './pages/Materials';
 import Assignments from './pages/Assignments';
 import Chat from './pages/Chat';
-
-axios.defaults.withCredentials = true;
 
 function App() {
   const [user, setUser] = useState(null);
@@ -22,7 +20,7 @@ function App() {
 
   const checkAuth = async () => {
     try {
-      const res = await axios.get('/api/me');
+      const res = await api.get('/api/me');
       if (res.data.authenticated) {
         setUser(res.data.user);
       } else {

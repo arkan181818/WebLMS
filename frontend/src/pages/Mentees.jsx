@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 import toast from 'react-hot-toast';
 import { UserCheck, UserX, Clock, Users, Search } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -16,7 +16,7 @@ export default function Mentees({ user, onLogout }) {
 
   const fetchPendingUsers = async () => {
     try {
-      const res = await axios.get('/api/users/pending');
+      const res = await api.get('/api/users/pending');
       setPendingUsers(res.data);
     } catch (err) {
       toast.error('Gagal mengambil daftar persetujuan');
@@ -27,7 +27,7 @@ export default function Mentees({ user, onLogout }) {
 
   const handleApprove = async (id) => {
     try {
-      await axios.post(`/api/users/${id}/approve`);
+      await api.post(`/api/users/${id}/approve`);
       toast.success('Akun berhasil disetujui');
       setPendingUsers(pendingUsers.filter(u => u.id !== id));
     } catch (err) {
@@ -38,7 +38,7 @@ export default function Mentees({ user, onLogout }) {
   const handleReject = async (id) => {
     if (!window.confirm('Yakin ingin menolak dan menghapus akun ini?')) return;
     try {
-      await axios.post(`/api/users/${id}/reject`);
+      await api.post(`/api/users/${id}/reject`);
       toast.success('Akun berhasil ditolak');
       setPendingUsers(pendingUsers.filter(u => u.id !== id));
     } catch (err) {

@@ -1,13 +1,13 @@
 import { LogOut, Home, BookOpen, PenTool, BarChart, MessageCircle, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function Sidebar({ user, onLogout }) {
   const handleLogout = async () => {
     try {
-      await axios.post('/api/logout');
+      await api.post('/api/logout');
       onLogout();
       toast.success('Berhasil keluar');
     } catch (err) {

@@ -5,3 +5,5 @@ __pycache__/
 instance/
 .idea/
 .vscode/
+node_modules/
+frontend/.env.production.local
