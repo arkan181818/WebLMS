@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from models import db, User, Subject, Material, MaterialProgress, Assignment, Submission
+from models import db, User, Subject, Material, MaterialProgress, Assignment, Submission, Message
 
 def init_db(app):
     db.init_app(app)

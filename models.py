@@ -13,10 +13,11 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(120), nullable=True)
     role = db.Column(db.String(20), nullable=False, default='murid')  # 'guru' (admin) atau 'murid'
+    is_approved = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     # Relasi
-    materials_created = db.relationship('Material', backref='author', lazy=True, cascade="all, delete-orphan")
+    materials_created = db.relationship('Material', foreign_keys='Material.teacher_id', backref='author', lazy=True, cascade="all, delete-orphan")
     progress_records = db.relationship('MaterialProgress', backref='student', lazy=True, cascade="all, delete-orphan")
 
     def set_password(self, password):
@@ -65,6 +66,7 @@ class Material(db.Model):
     
     subject_id = db.Column(db.Integer, db.ForeignKey('subjects.id'), nullable=False)
     teacher_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    target_student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
     video_url = db.Column(db.String(300), nullable=True)
     attachment_filename = db.Column(db.String(255), nullable=True)
@@ -126,6 +128,7 @@ class Assignment(db.Model):
     description = db.Column(db.Text, nullable=False)
     subject_id = db.Column(db.Integer, db.ForeignKey('subjects.id'), nullable=False)
     teacher_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    target_student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
     due_date = db.Column(db.DateTime, nullable=True)
     attachment_filename = db.Column(db.String(255), nullable=True)
@@ -136,7 +139,8 @@ class Assignment(db.Model):
 
     # Relasi
     subject = db.relationship('Subject', backref=db.backref('assignments', lazy=True, cascade='all, delete-orphan'))
-    teacher = db.relationship('User', backref=db.backref('assignments_created', lazy=True, cascade='all, delete-orphan'))
+    teacher = db.relationship('User', foreign_keys=[teacher_id], backref=db.backref('assignments_created', lazy=True, cascade='all, delete-orphan'))
+    target_student = db.relationship('User', foreign_keys=[target_student_id], backref=db.backref('assignments_received', lazy=True, cascade='all, delete-orphan'))
     submissions = db.relationship('Submission', backref='assignment', lazy=True, cascade='all, delete-orphan')
 
     @property
@@ -191,3 +195,20 @@ class Submission(db.Model):
     def __repr__(self):
         return f'<Submission Student:{self.student_id} Task:{self.assignment_id}>'
 
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    is_read = db.Column(db.Boolean, default=False)
+
+    # Relasi
+    sender = db.relationship('User', foreign_keys=[sender_id], backref=db.backref('sent_messages', lazy=True, cascade='all, delete-orphan'))
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref=db.backref('received_messages', lazy=True, cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<Message From:{self.sender_id} To:{self.receiver_id}>'
