@@ -31,16 +31,16 @@ export default function Mentees({ user, onLogout }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pendingRes, studentsRes, mentorsRes] = await Promise.all([
+      const [pendingRes, studentsRes, mentorsRes] = await Promise.allSettled([
         api.get('/api/users/pending'),
         api.get('/api/users/students'),
         api.get('/api/users/teachers')
       ]);
-      setPendingUsers(pendingRes.data || []);
-      setApprovedStudents(studentsRes.data || []);
-      setMentors(mentorsRes.data || []);
+      if (pendingRes.status === 'fulfilled') setPendingUsers(pendingRes.value.data || []);
+      if (studentsRes.status === 'fulfilled') setApprovedStudents(studentsRes.value.data || []);
+      if (mentorsRes.status === 'fulfilled') setMentors(mentorsRes.value.data || []);
     } catch (err) {
-      toast.error('Gagal mengambil data murid');
+      console.error(err);
     } finally {
       setLoading(false);
     }
