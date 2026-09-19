@@ -32,8 +32,11 @@ export default function Login({ onLogin }) {
     try {
       const res = await api.post('/api/login', { identifier, password });
       if (res.data.success) {
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+        }
         toast.success(res.data.message);
-        onLogin();
+        await onLogin();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal masuk. Silakan coba lagi.');

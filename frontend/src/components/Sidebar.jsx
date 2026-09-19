@@ -10,10 +10,12 @@ export default function Sidebar({ user, onLogout }) {
   const handleLogout = async () => {
     try {
       await api.post('/api/logout');
+    } catch (err) {
+      // ignore
+    } finally {
+      localStorage.removeItem('token');
       onLogout();
       toast.success('Berhasil keluar');
-    } catch (err) {
-      toast.error('Gagal keluar');
     }
   };
 
