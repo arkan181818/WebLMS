@@ -35,10 +35,13 @@ export default function Login({ onLogin }) {
         if (res.data.token) {
           localStorage.setItem('token', res.data.token);
         }
+        if (res.data.user) {
+          localStorage.setItem('user', JSON.stringify(res.data.user));
+        }
         toast.success(res.data.message);
         setTimeout(() => {
           window.location.href = '/dashboard';
-        }, 600);
+        }, 500);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal masuk. Silakan coba lagi.');

@@ -11,7 +11,14 @@ import Assignments from './pages/Assignments';
 import Chat from './pages/Chat';
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,15 +26,29 @@ function App() {
   }, []);
 
   const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setUser(null);
+      localStorage.removeItem('user');
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get('/api/me');
       if (res.data.authenticated) {
         setUser(res.data.user);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
       } else {
         setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
     } catch (err) {
-      setUser(null);
+      if (err.response?.status === 401) {
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     } finally {
       setLoading(false);
     }

@@ -19,7 +19,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      // Don't redirect if already on login/landing page
+      localStorage.removeItem('user');
       if (!['/login', '/'].includes(window.location.pathname)) {
         window.location.href = '/login';
       }

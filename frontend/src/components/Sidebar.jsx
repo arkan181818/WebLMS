@@ -14,6 +14,7 @@ export default function Sidebar({ user, onLogout }) {
       // ignore
     } finally {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       onLogout();
       toast.success('Berhasil keluar');
     }
