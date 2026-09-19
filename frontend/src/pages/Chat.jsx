@@ -35,7 +35,6 @@ export default function Chat({ user, onLogout }) {
         const res = await api.get('/api/users/students');
         setContacts(res.data);
       } else {
-        // Murid: cukup chat ke guru (kita ambil daftar guru)
         const res = await api.get('/api/users/teachers');
         setContacts(res.data);
       }
@@ -65,26 +64,31 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
+  if (loading) {
+    return (
+      <div className="page-bg flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex">
+    <div className="page-bg flex">
       <Sidebar user={user} onLogout={onLogout} />
 
-      <div className="flex-1 ml-64 flex flex-col h-screen">
-        {/* Chat Layout */}
+      <div className="flex-1 ml-64 flex flex-col h-screen relative z-10">
         <div className="flex flex-1 overflow-hidden">
           {/* Contact List */}
-          <div className="w-80 bg-white border-r border-slate-200 flex flex-col">
-            <div className="p-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">
+          <div className="w-80 bg-[#0B1120]/80 backdrop-blur-xl border-r border-white/[0.06] flex flex-col">
+            <div className="p-5 border-b border-white/[0.06]">
+              <h2 className="text-lg font-bold text-white">
                 {user.role === 'guru' ? 'Murid Aktif' : 'Mentor Saya'}
               </h2>
             </div>
             <div className="flex-1 overflow-y-auto">
               {contacts.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 text-sm">
-                  <UserIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <div className="p-8 text-center text-slate-500 text-sm">
+                  <UserIcon className="w-12 h-12 mx-auto mb-3 text-slate-700" />
                   Belum ada kontak tersedia.
                 </div>
               ) : (
@@ -92,16 +96,20 @@ export default function Chat({ user, onLogout }) {
                   <button
                     key={c.id}
                     onClick={() => setSelectedContact(c)}
-                    className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 ${
-                      selectedContact?.id === c.id ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+                    className={`w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-white/[0.04] transition-all duration-200 border-b border-white/[0.03] ${
+                      selectedContact?.id === c.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''
                     }`}
                   >
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold uppercase">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm uppercase shrink-0 ${
+                      selectedContact?.id === c.id
+                        ? 'bg-gradient-to-br from-primary to-violet text-white shadow-lg shadow-primary/30'
+                        : 'bg-white/10 text-slate-400'
+                    }`}>
                       {c.full_name?.charAt(0) || '?'}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <h4 className="font-semibold text-slate-800 text-sm truncate">{c.full_name}</h4>
-                      <p className="text-xs text-slate-500 truncate">{c.email}</p>
+                      <h4 className={`font-semibold text-sm truncate ${selectedContact?.id === c.id ? 'text-white' : 'text-slate-300'}`}>{c.full_name}</h4>
+                      <p className="text-xs text-slate-600 truncate">{c.email}</p>
                     </div>
                   </button>
                 ))
@@ -110,30 +118,32 @@ export default function Chat({ user, onLogout }) {
           </div>
 
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col bg-slate-50">
+          <div className="flex-1 flex flex-col">
             {!selectedContact ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                <MessageCircle className="w-20 h-20 mb-4 text-slate-200" />
-                <h3 className="text-xl font-bold text-slate-500 mb-1">Pilih Kontak untuk Memulai</h3>
-                <p className="text-sm">Klik salah satu nama di sebelah kiri untuk membuka percakapan.</p>
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-5 border border-white/10">
+                  <MessageCircle className="w-12 h-12 text-slate-700" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-400 mb-1">Pilih Kontak</h3>
+                <p className="text-sm text-slate-600">Klik salah satu nama untuk membuka percakapan.</p>
               </div>
             ) : (
               <>
                 {/* Chat Header */}
-                <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center gap-3 shrink-0">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold uppercase">
+                <div className="bg-[#0B1120]/80 backdrop-blur-xl px-6 py-4 border-b border-white/[0.06] flex items-center gap-3 shrink-0">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary to-violet rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
                     {selectedContact.full_name?.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800">{selectedContact.full_name}</h3>
+                    <h3 className="font-bold text-white">{selectedContact.full_name}</h3>
                     <p className="text-xs text-slate-500">{selectedContact.email}</p>
                   </div>
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(30,27,75,0.3) 100%)' }}>
                   {messages.length === 0 && (
-                    <div className="text-center text-slate-400 text-sm mt-10">
+                    <div className="text-center text-slate-600 text-sm mt-10">
                       Belum ada pesan. Mulai percakapan sekarang!
                     </div>
                   )}
@@ -146,11 +156,11 @@ export default function Chat({ user, onLogout }) {
                     >
                       <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
                         m.sender_id === user.id
-                          ? 'bg-primary text-white rounded-br-md'
-                          : 'bg-white text-slate-800 border border-slate-200 rounded-bl-md'
+                          ? 'bg-gradient-to-r from-primary to-violet text-white rounded-br-md shadow-lg shadow-primary/20'
+                          : 'bg-white/[0.07] text-slate-200 border border-white/10 rounded-bl-md'
                       }`}>
                         <p className="whitespace-pre-wrap">{m.content}</p>
-                        <p className={`text-[10px] mt-1 ${m.sender_id === user.id ? 'text-white/60' : 'text-slate-400'}`}>
+                        <p className={`text-[10px] mt-1 ${m.sender_id === user.id ? 'text-white/50' : 'text-slate-600'}`}>
                           {new Date(m.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
@@ -160,7 +170,7 @@ export default function Chat({ user, onLogout }) {
                 </div>
 
                 {/* Input */}
-                <form onSubmit={handleSend} className="bg-white px-6 py-4 border-t border-slate-200 flex items-center gap-3 shrink-0">
+                <form onSubmit={handleSend} className="bg-[#0B1120]/80 backdrop-blur-xl px-6 py-4 border-t border-white/[0.06] flex items-center gap-3 shrink-0">
                   <input
                     type="text"
                     value={newMessage}
@@ -174,7 +184,7 @@ export default function Chat({ user, onLogout }) {
                     whileTap={{ scale: 0.9 }}
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="w-11 h-11 bg-primary hover:bg-primary-hover text-white rounded-full flex items-center justify-center transition-colors disabled:opacity-50"
+                    className="w-11 h-11 bg-gradient-to-r from-primary to-violet text-white rounded-full flex items-center justify-center shadow-lg shadow-primary/30 disabled:opacity-40 transition-all"
                   >
                     <Send size={18} />
                   </motion.button>

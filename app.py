@@ -1,8 +1,9 @@
 import os
 import re
+import jwt
 from functools import wraps
-from datetime import datetime
-from flask import Flask, request, jsonify, session, send_from_directory, abort
+from datetime import datetime, timedelta, timezone
+from flask import Flask, request, jsonify, send_from_directory, abort
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -23,12 +24,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 allowed_origins = [origin.strip() for origin in frontend_url.split(',')]
 allowed_origins.extend(["http://localhost:5173", "http://127.0.0.1:5173"])
-CORS(app, supports_credentials=True, origins=allowed_origins)
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
 def allowed_file(filename):
     if not filename or '.' not in filename:
@@ -37,18 +40,39 @@ def allowed_file(filename):
     return len(ext) > 0 and ext not in {'exe', 'bat', 'sh', 'cmd', 'vbs'}
 
 # ==========================================
-# AUTH HELPERS
+# JWT AUTH HELPERS
 # ==========================================
+def generate_token(user):
+    """Generate a JWT token for the given user."""
+    payload = {
+        'user_id': user.id,
+        'username': user.username,
+        'role': user.role,
+        'exp': datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
+        'iat': datetime.now(timezone.utc)
+    }
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
 def get_current_user():
-    user_id = session.get('user_id')
-    if user_id:
-        return db.session.get(User, user_id)
-    return None
+    """Extract and validate JWT token from Authorization header."""
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header[7:]  # Remove 'Bearer ' prefix
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        user = db.session.get(User, payload['user_id'])
+        return user
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('user_id'):
+        user = get_current_user()
+        if not user:
             return jsonify({'error': 'Unauthorized', 'message': 'Silakan masuk terlebih dahulu.'}), 401
         return f(*args, **kwargs)
     return decorated_function
@@ -96,12 +120,11 @@ def login():
         if not user.is_approved:
             return jsonify({'success': False, 'message': 'Akun Anda sedang menunggu persetujuan dari Guru/Admin.'}), 403
 
-        session['user_id'] = user.id
-        session['username'] = user.username
-        session['role'] = user.role
+        token = generate_token(user)
         return jsonify({
-            'success': True, 
+            'success': True,
             'message': f'Selamat datang kembali, {user.display_name}!',
+            'token': token,
             'user': {'id': user.id, 'role': user.role, 'name': user.display_name}
         })
     return jsonify({'success': False, 'message': 'Email/Username atau password salah.'}), 401
@@ -136,7 +159,7 @@ def register():
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    session.clear()
+    # With JWT, logout is handled client-side by removing the token
     return jsonify({'success': True, 'message': 'Anda telah berhasil keluar.'})
 
 @app.route('/api/users/students', methods=['GET'])

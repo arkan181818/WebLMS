@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import api from '../lib/api';
-import { Users, BookOpen, Layers, Target, Clock } from 'lucide-react';
+import { Users, BookOpen, Layers, Target, Clock, TrendingUp, ArrowUpRight } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 export default function Dashboard({ user, onLogout }) {
@@ -24,15 +24,19 @@ export default function Dashboard({ user, onLogout }) {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
+    return (
+      <div className="page-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <span className="text-slate-400 font-medium">Memuat...</span>
+        </div>
+      </div>
+    );
   }
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
   const itemVariants = {
@@ -40,64 +44,92 @@ export default function Dashboard({ user, onLogout }) {
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
   };
 
+  const statConfigs = user.role === 'guru' ? [
+    { icon: <BookOpen />, label: 'Total Materi', value: data.stats.total_materials, gradient: 'from-primary to-violet', shadow: 'shadow-primary/30' },
+    { icon: <Users />, label: 'Total Murid', value: data.stats.total_students, gradient: 'from-cyan to-secondary', shadow: 'shadow-cyan/30' },
+    { icon: <Layers />, label: 'Mata Pelajaran', value: data.stats.total_subjects, gradient: 'from-secondary to-emerald-400', shadow: 'shadow-secondary/30' },
+    { icon: <Target />, label: 'Total Tugas', value: data.stats.total_assignments, gradient: 'from-accent to-rose', shadow: 'shadow-accent/30' },
+  ] : [
+    { icon: <BookOpen />, label: 'Materi Tersedia', value: data.stats.total_materials, gradient: 'from-primary to-violet', shadow: 'shadow-primary/30' },
+    { icon: <Target />, label: 'Materi Selesai', value: data.stats.completed_count, gradient: 'from-secondary to-cyan', shadow: 'shadow-secondary/30' },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="page-bg flex">
+      <div className="mesh-grid" />
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
       <Sidebar user={user} onLogout={onLogout} />
-      
-      <div className="flex-1 ml-64 p-8">
+
+      <div className="flex-1 ml-64 p-8 relative z-10">
+        {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">Halo, {user.display_name}! 👋</h1>
-          <p className="text-slate-500 mt-2">Selamat datang kembali di RuangBelajar. Mari lanjutkan progresmu hari ini.</p>
+          <h1 className="text-3xl font-bold text-white">Halo, {user.display_name}! 👋</h1>
+          <p className="text-slate-400 mt-2">Selamat datang kembali di RuangBelajar. Mari lanjutkan progresmu hari ini.</p>
         </motion.div>
 
-        {user.role === 'guru' ? (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard icon={<BookOpen />} label="Total Materi" value={data.stats.total_materials} color="bg-blue-500" />
-            <StatCard icon={<Users />} label="Total Murid" value={data.stats.total_students} color="bg-indigo-500" />
-            <StatCard icon={<Layers />} label="Mata Pelajaran" value={data.stats.total_subjects} color="bg-emerald-500" />
-            <StatCard icon={<Target />} label="Total Tugas" value={data.stats.total_assignments} color="bg-orange-500" />
-          </motion.div>
-        ) : (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <StatCard icon={<BookOpen />} label="Materi Tersedia" value={data.stats.total_materials} color="bg-blue-500" />
-            <StatCard icon={<Target />} label="Materi Selesai" value={data.stats.completed_count} color="bg-emerald-500" />
-            
-            <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
-              <h3 className="text-slate-500 text-sm font-medium mb-2">Progres Keseluruhan</h3>
-              <div className="flex items-end gap-2 mb-2">
-                <span className="text-3xl font-bold text-slate-800">{data.stats.progress_percentage}%</span>
+        {/* Stats */}
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className={`grid grid-cols-1 md:grid-cols-2 ${user.role === 'guru' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-5 mb-8`}>
+          {statConfigs.map((stat, idx) => (
+            <motion.div key={idx} variants={itemVariants} className="glass-card p-5 flex items-center gap-4 group hover:border-white/20 transition-all duration-300">
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center text-white shadow-lg ${stat.shadow} group-hover:scale-110 transition-transform duration-300`}>
+                {stat.icon}
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${data.stats.progress_percentage}%` }}
-                  transition={{ duration: 1, ease: "easeOut" }}
-                  className="bg-primary h-2.5 rounded-full"
-                ></motion.div>
+              <div>
+                <p className="text-sm text-slate-400 font-medium">{stat.label}</p>
+                <p className="text-3xl font-bold text-white mt-0.5">{stat.value}</p>
               </div>
             </motion.div>
-          </motion.div>
-        )}
+          ))}
 
-        <motion.div variants={containerVariants} initial="hidden" animate="show" className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          {/* Progress card for murid */}
+          {user.role === 'murid' && (
+            <motion.div variants={itemVariants} className="glass-card p-5 flex flex-col justify-center">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-slate-400 font-medium">Progres Keseluruhan</p>
+                <TrendingUp size={16} className="text-primary-light" />
+              </div>
+              <div className="flex items-end gap-2 mb-3">
+                <span className="text-3xl font-bold text-white">{data.stats.progress_percentage}%</span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${data.stats.progress_percentage}%` }}
+                  transition={{ duration: 1.2, ease: "easeOut" }}
+                  className="bg-gradient-to-r from-primary to-violet h-2.5 rounded-full shadow-lg shadow-primary/30"
+                />
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* Recent Materials */}
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="glass-card p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-slate-800">
+            <h2 className="text-xl font-bold text-white">
               {user.role === 'guru' ? 'Materi Terakhir Ditambahkan' : 'Materi Terbaru'}
             </h2>
-            <button className="text-sm font-medium text-primary hover:text-primary-hover">Lihat Semua</button>
+            <button className="text-sm font-medium text-primary-light hover:text-white transition-colors flex items-center gap-1">
+              Lihat Semua <ArrowUpRight size={14} />
+            </button>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(user.role === 'guru' ? data.recent_materials : data.latest_materials).map((materi, idx) => (
-              <motion.div variants={itemVariants} key={idx} className="flex gap-4 p-4 rounded-xl border border-slate-100 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer group bg-slate-50 hover:bg-white">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <BookOpen size={24} />
+              <motion.div
+                variants={itemVariants}
+                key={idx}
+                className="flex gap-4 p-4 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.07] hover:border-primary/30 transition-all duration-300 cursor-pointer group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-violet/20 text-primary-light flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 border border-primary/20">
+                  <BookOpen size={22} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-800 mb-1 group-hover:text-primary transition-colors">{materi.title}</h4>
+                  <h4 className="font-bold text-white mb-1 group-hover:text-primary-light transition-colors">{materi.title}</h4>
                   {materi.summary && <p className="text-sm text-slate-500 line-clamp-2">{materi.summary}</p>}
-                  <div className="flex items-center gap-2 mt-3 text-xs font-medium text-slate-400">
-                    <Clock size={14} /> Baru saja ditambahkan
+                  <div className="flex items-center gap-2 mt-3 text-xs font-medium text-slate-600">
+                    <Clock size={12} /> Baru saja ditambahkan
                   </div>
                 </div>
               </motion.div>
@@ -107,26 +139,7 @@ export default function Dashboard({ user, onLogout }) {
             )}
           </div>
         </motion.div>
-
       </div>
     </div>
-  );
-}
-
-function StatCard({ icon, label, value, color }) {
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
-  };
-  return (
-    <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg ${color}`}>
-        {icon}
-      </div>
-      <div>
-        <h3 className="text-slate-500 text-sm font-medium">{label}</h3>
-        <p className="text-3xl font-bold text-slate-800 mt-1">{value}</p>
-      </div>
-    </motion.div>
   );
 }

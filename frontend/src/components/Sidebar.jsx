@@ -1,10 +1,12 @@
-import { LogOut, Home, BookOpen, PenTool, BarChart, MessageCircle, Users } from 'lucide-react';
+import { LogOut, Home, BookOpen, PenTool, MessageCircle, Users, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../lib/api';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function Sidebar({ user, onLogout }) {
+  const location = useLocation();
+
   const handleLogout = async () => {
     try {
       await api.post('/api/logout');
@@ -29,48 +31,54 @@ export default function Sidebar({ user, onLogout }) {
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col fixed left-0 top-0">
-      <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-          <BookOpen size={24} />
+    <div className="w-64 h-screen flex flex-col fixed left-0 top-0 z-40 bg-[#0B1120]/90 backdrop-blur-2xl border-r border-white/[0.06]">
+      {/* Logo */}
+      <div className="p-6 border-b border-white/[0.06] flex items-center gap-3">
+        <div className="w-10 h-10 bg-gradient-to-br from-primary to-violet rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
+          <Sparkles size={22} />
         </div>
         <div>
-          <h1 className="font-bold text-slate-800 text-lg leading-tight">RuangBelajar</h1>
-          <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">{user.role} Panel</span>
+          <h1 className="font-bold text-white text-lg leading-tight">RuangBelajar</h1>
+          <span className="text-[10px] text-primary-light font-semibold uppercase tracking-widest">{user.role} Panel</span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-        {navItems.map((item, idx) => (
-          <motion.div whileHover={{ x: 4 }} key={idx}>
-            <Link
-              to={item.path}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                window.location.pathname === item.path
-                  ? 'bg-primary text-white font-medium shadow-md shadow-primary/20' 
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-primary font-medium'
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          </motion.div>
-        ))}
+      {/* Nav */}
+      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+        {navItems.map((item, idx) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <motion.div whileHover={{ x: 4 }} key={idx}>
+              <Link
+                to={item.path}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-primary/20 to-violet/10 text-white font-semibold border border-primary/30 shadow-lg shadow-primary/10'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
+                }`}
+              >
+                <span className={isActive ? 'text-primary-light' : ''}>{item.icon}</span>
+                {item.label}
+              </Link>
+            </motion.div>
+          );
+        })}
       </div>
 
-      <div className="p-4 border-t border-slate-100">
+      {/* User info */}
+      <div className="p-4 border-t border-white/[0.06]">
         <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold uppercase">
+          <div className="w-10 h-10 bg-gradient-to-br from-primary to-cyan rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
             {user.display_name ? user.display_name.charAt(0) : '?'}
           </div>
           <div className="flex-1 overflow-hidden">
-            <h4 className="text-sm font-bold text-slate-800 truncate">{user.display_name}</h4>
+            <h4 className="text-sm font-bold text-white truncate">{user.display_name}</h4>
             <p className="text-xs text-slate-500 truncate capitalize">{user.role}</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors font-medium text-sm"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-rose/80 hover:text-white hover:bg-rose/20 rounded-xl transition-all duration-300 font-medium text-sm border border-transparent hover:border-rose/30"
         >
           <LogOut size={18} /> Keluar
         </button>
