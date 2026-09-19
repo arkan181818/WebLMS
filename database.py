@@ -28,5 +28,22 @@ def _add_missing_user_columns():
 
 def seed_data():
     """Mengisi data awal jika database masih kosong"""
-    pass
+    try:
+        if User.query.filter_by(role='guru').count() == 0:
+            default_guru = User(
+                username='admin_guru',
+                email='admin@sekolah.com',
+                full_name='Admin Guru Utama, S.Kom., M.T.',
+                campus='Universitas Indonesia',
+                department='Teknik Informatika',
+                semester='Semester 8',
+                role='guru',
+                is_approved=True
+            )
+            default_guru.set_password('admin123')
+            db.session.add(default_guru)
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Seed notice: {e}")
 
