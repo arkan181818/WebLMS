@@ -17,6 +17,7 @@ export default function Login({ onLogin }) {
   const [regFullName, setRegFullName] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
+  const [regRole, setRegRole] = useState('murid');
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -64,14 +65,15 @@ export default function Login({ onLogin }) {
         full_name: regFullName,
         password: regPassword,
         confirm_password: regConfirm,
+        role: regRole,
       });
       if (res.data.success) {
         toast.success(res.data.message);
         setIsRegister(false);
-        setRegUsername(''); setRegEmail(''); setRegFullName(''); setRegPassword(''); setRegConfirm('');
+        setRegUsername(''); setRegEmail(''); setRegFullName(''); setRegPassword(''); setRegConfirm(''); setRegRole('murid');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal mendaftar.');
+      toast.error(err.response?.data?.message || 'Pendaftaran gagal.');
     } finally {
       setIsLoading(false);
     }
@@ -171,6 +173,34 @@ export default function Login({ onLogin }) {
               </div>
 
               <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Daftar Sebagai <span className="text-rose">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setRegRole('murid')}
+                      className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all ${
+                        regRole === 'murid'
+                          ? 'bg-primary/20 border-primary text-primary-light shadow-lg shadow-primary/20'
+                          : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                      }`}
+                    >
+                      Murid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegRole('guru')}
+                      className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all ${
+                        regRole === 'guru'
+                          ? 'bg-violet/20 border-violet text-violet-light shadow-lg shadow-violet/20'
+                          : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                      }`}
+                    >
+                      Guru / Mentor
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Nama Lengkap</label>
                   <input type="text" value={regFullName} onChange={(e) => setRegFullName(e.target.value)} className="input-field" placeholder="Nama lengkap Anda" />

@@ -145,7 +145,9 @@ def register():
     full_name = data.get('full_name', '').strip()
     password = data.get('password', '')
     confirm_password = data.get('confirm_password', '')
-    role = 'murid'
+    role = data.get('role', 'murid')
+    if role not in ['murid', 'guru']:
+        role = 'murid'
 
     if not username or not email or not password:
         return jsonify({'success': False, 'message': 'Harap isi semua kolom yang wajib.'}), 400
@@ -163,7 +165,8 @@ def register():
     new_user.set_password(password)
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({'success': True, 'message': 'Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan Guru.'})
+    msg = 'Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan dari Admin/Guru.'
+    return jsonify({'success': True, 'message': msg})
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
@@ -537,18 +540,38 @@ def submit_assignment(assignment_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Tugas berhasil dikirim.'}), 201
 
-@app.route('/api/chat/<int:student_id>', methods=['GET'])
+@app.route('/api/users/create_teacher', methods=['POST'])
 @login_required
-def get_chat(student_id):
+def create_teacher():
     user = get_current_user()
-    
-    # Validasi otorisasi (IDOR check)
-    if user.role == 'murid' and user.id != student_id:
-        return jsonify({'error': 'Forbidden', 'message': 'Anda tidak berhak melihat pesan ini.'}), 403
+    if user.role != 'guru':
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.json
+    username = data.get('username', '').strip()
+    email = data.get('email', '').strip().lower()
+    full_name = data.get('full_name', '').strip()
+    password = data.get('password', '')
 
+    if not username or not email or not password:
+        return jsonify({'success': False, 'message': 'Username, email, dan password wajib diisi.'}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({'success': False, 'message': 'Username sudah digunakan.'}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'success': False, 'message': 'Email sudah terdaftar.'}), 400
+
+    new_teacher = User(username=username, email=email, full_name=full_name if full_name else username, role='guru', is_approved=True)
+    new_teacher.set_password(password)
+    db.session.add(new_teacher)
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'Mentor/Guru {new_teacher.display_name} berhasil ditambahkan!'})
+
+@app.route('/api/chat/<int:target_id>', methods=['GET'])
+@login_required
+def get_chat(target_id):
+    user = get_current_user()
     messages = Message.query.filter(
-        ((Message.sender_id == user.id) & (Message.receiver_id == student_id)) |
-        ((Message.sender_id == student_id) & (Message.receiver_id == user.id))
+        ((Message.sender_id == user.id) & (Message.receiver_id == target_id)) |
+        ((Message.sender_id == target_id) & (Message.receiver_id == user.id))
     ).order_by(Message.timestamp.asc()).all()
     
     return jsonify([{
@@ -560,23 +583,18 @@ def get_chat(student_id):
         'is_read': m.is_read
     } for m in messages])
 
-@app.route('/api/chat/<int:student_id>', methods=['POST'])
+@app.route('/api/chat/<int:target_id>', methods=['POST'])
 @login_required
-def send_message(student_id):
+def send_message(target_id):
     user = get_current_user()
-    if user.role == 'murid' and user.id != student_id:
-        return jsonify({'error': 'Forbidden', 'message': 'Anda tidak berhak mengirim pesan sebagai pengguna ini.'}), 403
-
     data = request.json
     content = data.get('content', '').strip()
     if not content:
         return jsonify({'error': 'Bad Request', 'message': 'Pesan tidak boleh kosong.'}), 400
 
-    receiver_id = student_id if user.role == 'guru' else User.query.filter_by(role='guru').first().id
-
     new_message = Message(
         sender_id=user.id,
-        receiver_id=receiver_id,
+        receiver_id=target_id,
         content=content
     )
     db.session.add(new_message)

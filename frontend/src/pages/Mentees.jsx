@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { UserCheck, UserX, Clock, Users, CheckCircle2 } from 'lucide-react';
+import { UserCheck, UserX, Clock, Users, CheckCircle2, UserPlus, X, Save } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 export default function Mentees({ user, onLogout }) {
   const [approvedStudents, setApprovedStudents] = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
+
+  // Form tambah mentor
+  const [tUsername, setTUsername] = useState('');
+  const [tEmail, setTEmail] = useState('');
+  const [tFullName, setTFullName] = useState('');
+  const [tPassword, setTPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -33,9 +41,11 @@ export default function Mentees({ user, onLogout }) {
   const handleApprove = async (student) => {
     try {
       await api.post(`/api/users/${student.id}/approve`);
-      toast.success(`Akun ${student.full_name} berhasil disetujui`);
+      toast.success(`Akun ${student.full_name} (${student.role}) berhasil disetujui`);
       setPendingUsers(prev => prev.filter(u => u.id !== student.id));
-      setApprovedStudents(prev => [student, ...prev]);
+      if (student.role === 'murid') {
+        setApprovedStudents(prev => [student, ...prev]);
+      }
     } catch (err) {
       toast.error('Gagal menyetujui akun');
     }
@@ -49,6 +59,31 @@ export default function Mentees({ user, onLogout }) {
       setPendingUsers(prev => prev.filter(u => u.id !== id));
     } catch (err) {
       toast.error('Gagal menolak pendaftaran');
+    }
+  };
+
+  const handleCreateTeacher = async (e) => {
+    e.preventDefault();
+    if (!tUsername || !tEmail || !tPassword) {
+      toast.error('Username, email, dan password wajib diisi');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await api.post('/api/users/create_teacher', {
+        username: tUsername,
+        email: tEmail,
+        full_name: tFullName,
+        password: tPassword
+      });
+      toast.success(res.data.message);
+      setShowTeacherModal(false);
+      setTUsername(''); setTEmail(''); setTFullName(''); setTPassword('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menambahkan mentor');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -68,9 +103,19 @@ export default function Mentees({ user, onLogout }) {
       <Sidebar user={user} onLogout={onLogout} />
 
       <div className="flex-1 ml-64 p-8 relative z-10">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Daftar Murid</h1>
-          <p className="text-slate-400 mt-2">Kelola daftar murid yang terdaftar dan persetujuan pendaftar baru.</p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Daftar Murid & Pengelolaan Mentor</h1>
+            <p className="text-slate-400 mt-2">Kelola daftar murid terdaftar, persetujuan pendaftar baru, dan penambahan mentor.</p>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowTeacherModal(true)}
+            className="btn btn-primary flex items-center gap-2 shadow-lg shadow-primary/30"
+          >
+            <UserPlus size={18} /> Tambah Mentor Baru
+          </motion.button>
         </motion.div>
 
         {/* Layout Kanan & Kiri */}
@@ -161,7 +206,14 @@ export default function Mentees({ user, onLogout }) {
                         {(student.full_name || student.username || 'P').charAt(0)}
                       </div>
                       <div>
-                        <h3 className="font-bold text-white text-sm">{student.full_name || student.username}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-white text-sm">{student.full_name || student.username}</h3>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                            student.role === 'guru' ? 'bg-violet/20 border border-violet/40 text-violet-light' : 'bg-primary/20 border border-primary/40 text-primary-light'
+                          }`}>
+                            {student.role === 'guru' ? 'Guru/Mentor' : 'Murid'}
+                          </span>
+                        </div>
                         <p className="text-xs text-slate-400">{student.email}</p>
                       </div>
                     </div>
@@ -190,6 +242,100 @@ export default function Mentees({ user, onLogout }) {
           </div>
 
         </div>
+
+        {/* Modal Tambah Mentor Baru */}
+        <AnimatePresence>
+          {showTeacherModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="glass-card w-full max-w-md p-6 relative"
+              >
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/[0.08]">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <UserPlus className="text-violet-light" size={24} /> Tambah Mentor / Guru Baru
+                  </h2>
+                  <button onClick={() => setShowTeacherModal(false)} className="text-slate-400 hover:text-white p-1">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateTeacher} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Nama Lengkap & Gelar</label>
+                    <input
+                      type="text"
+                      value={tFullName}
+                      onChange={e => setTFullName(e.target.value)}
+                      placeholder="Contoh: Budi Santoso, S.Kom."
+                      className="input-field"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      Username <span className="text-rose">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={tUsername}
+                      onChange={e => setTUsername(e.target.value)}
+                      placeholder="username_mentor"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      Email Mentor <span className="text-rose">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={tEmail}
+                      onChange={e => setTEmail(e.target.value)}
+                      placeholder="mentor@sekolah.com"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      Password <span className="text-rose">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={tPassword}
+                      onChange={e => setTPassword(e.target.value)}
+                      placeholder="Min. 6 karakter"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+
+                  <div className="pt-4 flex justify-end gap-3">
+                    <button type="button" onClick={() => setShowTeacherModal(false)} className="btn bg-white/5 hover:bg-white/10 text-slate-300">
+                      Batal
+                    </button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="btn btn-primary flex items-center gap-2"
+                    >
+                      <Save size={18} /> {isSubmitting ? 'Menyimpan...' : 'Tambah Mentor'}
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   );
