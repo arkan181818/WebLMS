@@ -11,16 +11,20 @@ def init_db(app):
         seed_data()
 
 def _add_missing_user_columns():
-    columns = {column['name'] for column in inspect(db.engine).get_columns('users')}
-    if 'department' not in columns:
-        db.session.execute(text('ALTER TABLE users ADD COLUMN department VARCHAR(120)'))
-        db.session.commit()
-    if 'campus' not in columns:
-        db.session.execute(text('ALTER TABLE users ADD COLUMN campus VARCHAR(150)'))
-        db.session.commit()
-    if 'semester' not in columns:
-        db.session.execute(text('ALTER TABLE users ADD COLUMN semester VARCHAR(50)'))
-        db.session.commit()
+    try:
+        inspector = inspect(db.engine)
+        if inspector.has_table('users'):
+            columns = {column['name'] for column in inspector.get_columns('users')}
+            if 'department' not in columns:
+                db.session.execute(text('ALTER TABLE users ADD COLUMN department VARCHAR(120)'))
+            if 'campus' not in columns:
+                db.session.execute(text('ALTER TABLE users ADD COLUMN campus VARCHAR(150)'))
+            if 'semester' not in columns:
+                db.session.execute(text('ALTER TABLE users ADD COLUMN semester VARCHAR(50)'))
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Migration notice: {e}")
 
 def seed_data():
     """Mengisi data awal jika database masih kosong"""
