@@ -23,12 +23,12 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="page-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <span className="text-slate-400 font-medium">Memuat...</span>
+          <span className="text-slate-400 font-medium">Memuat Dashboard...</span>
         </div>
       </div>
     );
@@ -44,14 +44,18 @@ export default function Dashboard({ user, onLogout }) {
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
   };
 
-  const statConfigs = user.role === 'guru' ? [
-    { icon: <BookOpen />, label: 'Total Materi', value: data.stats.total_materials, gradient: 'from-primary to-violet', shadow: 'shadow-primary/30' },
-    { icon: <Users />, label: 'Total Murid', value: data.stats.total_students, gradient: 'from-cyan to-secondary', shadow: 'shadow-cyan/30' },
-    { icon: <Layers />, label: 'Mata Pelajaran', value: data.stats.total_subjects, gradient: 'from-secondary to-emerald-400', shadow: 'shadow-secondary/30' },
-    { icon: <Target />, label: 'Total Tugas', value: data.stats.total_assignments, gradient: 'from-accent to-rose', shadow: 'shadow-accent/30' },
+  const stats = data?.stats || {};
+  const isGuru = user?.role === 'guru';
+  const recentMaterials = isGuru ? (data?.recent_materials || []) : (data?.latest_materials || []);
+
+  const statConfigs = isGuru ? [
+    { icon: <BookOpen />, label: 'Total Materi', value: stats.total_materials || 0, gradient: 'from-primary to-violet', shadow: 'shadow-primary/30' },
+    { icon: <Users />, label: 'Total Murid', value: stats.total_students || 0, gradient: 'from-cyan to-secondary', shadow: 'shadow-cyan/30' },
+    { icon: <Layers />, label: 'Mata Pelajaran', value: stats.total_subjects || 0, gradient: 'from-secondary to-emerald-400', shadow: 'shadow-secondary/30' },
+    { icon: <Target />, label: 'Total Tugas', value: stats.total_assignments || 0, gradient: 'from-accent to-rose', shadow: 'shadow-accent/30' },
   ] : [
-    { icon: <BookOpen />, label: 'Materi Tersedia', value: data.stats.total_materials, gradient: 'from-primary to-violet', shadow: 'shadow-primary/30' },
-    { icon: <Target />, label: 'Materi Selesai', value: data.stats.completed_count, gradient: 'from-secondary to-cyan', shadow: 'shadow-secondary/30' },
+    { icon: <BookOpen />, label: 'Materi Tersedia', value: stats.total_materials || 0, gradient: 'from-primary to-violet', shadow: 'shadow-primary/30' },
+    { icon: <Target />, label: 'Materi Selesai', value: stats.completed_count || 0, gradient: 'from-secondary to-cyan', shadow: 'shadow-secondary/30' },
   ];
 
   return (
@@ -64,12 +68,12 @@ export default function Dashboard({ user, onLogout }) {
       <div className="flex-1 ml-64 p-8 relative z-10">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Halo, {user.display_name}! 👋</h1>
+          <h1 className="text-3xl font-bold text-white">Halo, {user?.display_name || user?.username || 'Pengguna'}! 👋</h1>
           <p className="text-slate-400 mt-2">Selamat datang kembali di RuangBelajar. Mari lanjutkan progresmu hari ini.</p>
         </motion.div>
 
         {/* Stats */}
-        <motion.div variants={containerVariants} initial="hidden" animate="show" className={`grid grid-cols-1 md:grid-cols-2 ${user.role === 'guru' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-5 mb-8`}>
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className={`grid grid-cols-1 md:grid-cols-2 ${isGuru ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-5 mb-8`}>
           {statConfigs.map((stat, idx) => (
             <motion.div key={idx} variants={itemVariants} className="glass-card p-5 flex items-center gap-4 group hover:border-white/20 transition-all duration-300">
               <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center text-white shadow-lg ${stat.shadow} group-hover:scale-110 transition-transform duration-300`}>
@@ -83,19 +87,19 @@ export default function Dashboard({ user, onLogout }) {
           ))}
 
           {/* Progress card for murid */}
-          {user.role === 'murid' && (
+          {!isGuru && (
             <motion.div variants={itemVariants} className="glass-card p-5 flex flex-col justify-center">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-slate-400 font-medium">Progres Keseluruhan</p>
                 <TrendingUp size={16} className="text-primary-light" />
               </div>
               <div className="flex items-end gap-2 mb-3">
-                <span className="text-3xl font-bold text-white">{data.stats.progress_percentage}%</span>
+                <span className="text-3xl font-bold text-white">{stats.progress_percentage || 0}%</span>
               </div>
               <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${data.stats.progress_percentage}%` }}
+                  animate={{ width: `${stats.progress_percentage || 0}%` }}
                   transition={{ duration: 1.2, ease: "easeOut" }}
                   className="bg-gradient-to-r from-primary to-violet h-2.5 rounded-full shadow-lg shadow-primary/30"
                 />
@@ -108,7 +112,7 @@ export default function Dashboard({ user, onLogout }) {
         <motion.div variants={containerVariants} initial="hidden" animate="show" className="glass-card p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white">
-              {user.role === 'guru' ? 'Materi Terakhir Ditambahkan' : 'Materi Terbaru'}
+              {isGuru ? 'Materi Terakhir Ditambahkan' : 'Materi Terbaru'}
             </h2>
             <button className="text-sm font-medium text-primary-light hover:text-white transition-colors flex items-center gap-1">
               Lihat Semua <ArrowUpRight size={14} />
@@ -116,7 +120,7 @@ export default function Dashboard({ user, onLogout }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(user.role === 'guru' ? data.recent_materials : data.latest_materials).map((materi, idx) => (
+            {recentMaterials.map((materi, idx) => (
               <motion.div
                 variants={itemVariants}
                 key={idx}
@@ -134,7 +138,7 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </motion.div>
             ))}
-            {(user.role === 'guru' ? data.recent_materials : data.latest_materials).length === 0 && (
+            {recentMaterials.length === 0 && (
               <div className="col-span-full py-8 text-center text-slate-500">Belum ada materi.</div>
             )}
           </div>
