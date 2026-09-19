@@ -7,8 +7,21 @@ def init_db(app):
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        _optimize_database_performance()
         _add_missing_user_columns()
         seed_data()
+
+def _optimize_database_performance():
+    try:
+        if 'sqlite' in str(db.engine.url):
+            with db.engine.connect() as conn:
+                conn.execute(text('PRAGMA journal_mode=WAL;'))
+                conn.execute(text('PRAGMA synchronous=NORMAL;'))
+                conn.execute(text('PRAGMA cache_size=-64000;'))
+                conn.execute(text('PRAGMA temp_store=MEMORY;'))
+                conn.commit()
+    except Exception as e:
+        print(f"DB Optimization notice: {e}")
 
 def _add_missing_user_columns():
     try:

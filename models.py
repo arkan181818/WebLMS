@@ -15,8 +15,8 @@ class User(db.Model):
     department = db.Column(db.String(120), nullable=True)  # Jurusan
     campus = db.Column(db.String(150), nullable=True)      # Nama Kampus
     semester = db.Column(db.String(50), nullable=True)     # Semester
-    role = db.Column(db.String(20), nullable=False, default='murid')  # 'guru' (admin) atau 'murid'
-    is_approved = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(20), nullable=False, default='murid', index=True)  # 'guru' (admin) atau 'murid'
+    is_approved = db.Column(db.Boolean, default=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     # Relasi
@@ -203,11 +203,15 @@ class Message(db.Model):
     __tablename__ = 'messages'
 
     id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.now)
-    is_read = db.Column(db.Boolean, default=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now, index=True)
+    is_read = db.Column(db.Boolean, default=False, index=True)
+
+    __table_args__ = (
+        db.Index('idx_messages_conversation', 'sender_id', 'receiver_id', 'timestamp'),
+    )
 
     # Relasi
     sender = db.relationship('User', foreign_keys=[sender_id], backref=db.backref('sent_messages', lazy=True, cascade='all, delete-orphan'))

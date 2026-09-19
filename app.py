@@ -743,12 +743,12 @@ def get_chat(target_id):
         ((Message.sender_id == target_id) & (Message.receiver_id == user.id))
     ).order_by(Message.timestamp.asc()).all()
 
-    unread_messages = [message for message in messages
-                       if message.receiver_id == user.id and not message.is_read]
-    for message in unread_messages:
-        message.is_read = True
-    if unread_messages:
-        db.session.commit()
+    Message.query.filter(
+        Message.sender_id == target_id,
+        Message.receiver_id == user.id,
+        Message.is_read == False
+    ).update({Message.is_read: True}, synchronize_session=False)
+    db.session.commit()
     
     return jsonify([{
         'id': m.id,
