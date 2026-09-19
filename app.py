@@ -667,8 +667,22 @@ def create_teacher():
 
         if not campus or not email or not password:
             return jsonify({'success': False, 'message': 'Nama Kampus, email, dan password wajib diisi.'}), 400
-        if User.query.filter_by(email=email).first():
-            return jsonify({'success': False, 'message': 'Email sudah terdaftar. Silakan gunakan email lain.'}), 400
+
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            existing_user.role = 'guru'
+            existing_user.is_approved = True
+            existing_user.campus = campus
+            if department:
+                existing_user.department = department
+            if semester:
+                existing_user.semester = semester
+            if full_name:
+                existing_user.full_name = full_name
+            if password:
+                existing_user.set_password(password)
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'Akun {existing_user.display_name} ({email}) berhasil diaktifkan menjadi Mentor!'})
 
         base_username = email.split('@')[0] if email else (raw_username or 'mentor')
         clean_username = re.sub(r'[^a-zA-Z0-9_]', '_', base_username)[:50]
@@ -691,7 +705,7 @@ def create_teacher():
         new_teacher.set_password(password)
         db.session.add(new_teacher)
         db.session.commit()
-        return jsonify({'success': True, 'message': f'Mentor/Guru {new_teacher.display_name} berhasil ditambahkan!'})
+        return jsonify({'success': True, 'message': f'Mentor {new_teacher.display_name} berhasil ditambahkan!'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Gagal menambahkan mentor: {str(e)}'}), 500
