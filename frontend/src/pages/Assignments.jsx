@@ -99,13 +99,15 @@ export default function Assignments({ user, onLogout }) {
     return `${baseUrl}${urlPath.startsWith('/') ? '' : '/'}${urlPath}`;
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="page-bg flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
+
+  const isGuru = user?.role === 'guru';
 
   return (
     <div className="page-bg flex">
@@ -119,13 +121,13 @@ export default function Assignments({ user, onLogout }) {
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white">
-              {user.role === 'guru' ? 'Review & Kelola Tugas' : 'Tugas Saya'}
+              {isGuru ? 'Review & Kelola Tugas' : 'Tugas Saya'}
             </h1>
             <p className="text-slate-400 mt-2">
-              {user.role === 'guru' ? 'Buat penugasan baru dan periksa tugas yang diunggah oleh murid.' : 'Kerjakan dan unggah lembar tugas dari mentor Anda.'}
+              {isGuru ? 'Buat penugasan baru dan periksa tugas yang diunggah oleh murid.' : 'Kerjakan dan unggah lembar tugas dari mentor Anda.'}
             </p>
           </div>
-          {user.role === 'guru' && (
+          {isGuru && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

@@ -31,7 +31,7 @@ export default function Chat({ user, onLogout }) {
 
   const fetchContacts = async () => {
     try {
-      if (user.role === 'guru') {
+      if (user?.role === 'guru') {
         const res = await api.get('/api/users/students');
         setContacts(res.data || []);
       } else {
@@ -39,7 +39,7 @@ export default function Chat({ user, onLogout }) {
         setContacts(res.data || []);
       }
     } catch (err) {
-      toast.error('Gagal memuat daftar kontak');
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export default function Chat({ user, onLogout }) {
     }
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="page-bg flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
