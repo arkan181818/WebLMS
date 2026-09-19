@@ -103,6 +103,9 @@ def get_me():
                 'username': user.username,
                 'email': user.email,
                 'full_name': user.full_name,
+                'campus': user.campus or user.username,
+                'department': user.department,
+                'semester': user.semester,
                 'role': user.role,
                 'display_name': user.display_name
             }
@@ -130,6 +133,9 @@ def login():
                 'username': user.username,
                 'email': user.email,
                 'full_name': user.full_name,
+                'campus': user.campus or user.username,
+                'department': user.department,
+                'semester': user.semester,
                 'role': user.role,
                 'display_name': user.display_name,
                 'name': user.display_name
@@ -137,12 +143,58 @@ def login():
         })
     return jsonify({'success': False, 'message': 'Email/Username atau password salah.'}), 401
 
+@app.route('/api/profile/update', methods=['POST'])
+@login_required
+def update_profile():
+    user = get_current_user()
+    data = request.json
+    full_name = data.get('full_name', '').strip()
+    username = data.get('username', '').strip()
+    campus = data.get('campus', '').strip()
+    department = data.get('department', '').strip()
+    semester = data.get('semester', '').strip()
+
+    if username and username != user.username:
+        if User.query.filter(User.username == username, User.id != user.id).first():
+            return jsonify({'success': False, 'message': 'Username sudah digunakan oleh akun lain.'}), 400
+        user.username = username
+
+    if full_name:
+        user.full_name = full_name
+    if campus:
+        user.campus = campus
+    if department is not None:
+        user.department = department
+    if semester is not None:
+        user.semester = semester
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'Profil berhasil diperbarui!',
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'full_name': user.full_name,
+            'campus': user.campus or user.username,
+            'department': user.department,
+            'semester': user.semester,
+            'role': user.role,
+            'display_name': user.display_name,
+            'name': user.display_name
+        }
+    })
+
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json
-    username = data.get('username', '').strip()
+    username = data.get('username', '').strip() or data.get('campus', '').strip()
     email = data.get('email', '').strip().lower()
     full_name = data.get('full_name', '').strip()
+    campus = data.get('campus', '').strip() or username
+    department = data.get('department', '').strip()
+    semester = data.get('semester', '').strip()
     password = data.get('password', '')
     confirm_password = data.get('confirm_password', '')
     role = data.get('role', 'murid')
@@ -157,11 +209,14 @@ def register():
         return jsonify({'success': False, 'message': 'Password minimal harus terdiri dari 6 karakter.'}), 400
 
     if User.query.filter_by(username=username).first():
-        return jsonify({'success': False, 'message': 'Username sudah digunakan.'}), 400
+        return jsonify({'success': False, 'message': 'Username / Nama Kampus sudah digunakan.'}), 400
     if User.query.filter_by(email=email).first():
         return jsonify({'success': False, 'message': 'Email sudah terdaftar.'}), 400
 
-    new_user = User(username=username, email=email, full_name=full_name if full_name else username, role=role, is_approved=False)
+    new_user = User(
+        username=username, email=email, full_name=full_name if full_name else username,
+        campus=campus, department=department, semester=semester, role=role, is_approved=False
+    )
     new_user.set_password(password)
     db.session.add(new_user)
     db.session.commit()
@@ -417,7 +472,13 @@ def toggle_material(id):
 @login_required
 def get_teachers():
     teachers = User.query.filter_by(role='guru', is_approved=True).all()
-    return jsonify([{'id': t.id, 'full_name': t.display_name, 'email': t.email} for t in teachers])
+    return jsonify([{
+        'id': t.id,
+        'username': t.username,
+        'full_name': t.display_name,
+        'email': t.email,
+        'department': t.department
+    } for t in teachers])
 
 @app.route('/api/assignments', methods=['GET'])
 @login_required
@@ -540,6 +601,21 @@ def submit_assignment(assignment_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Tugas berhasil dikirim.'}), 201
 
+@app.route('/api/users/teachers', methods=['GET'])
+@login_required
+def get_teachers():
+    teachers = User.query.filter_by(role='guru', is_approved=True).all()
+    return jsonify([{
+        'id': t.id,
+        'username': t.username,
+        'full_name': t.full_name or t.display_name,
+        'email': t.email,
+        'campus': t.campus or t.username,
+        'department': t.department or '',
+        'semester': t.semester or '',
+        'role': 'guru'
+    } for t in teachers])
+
 @app.route('/api/users/create_teacher', methods=['POST'])
 @login_required
 def create_teacher():
@@ -547,23 +623,59 @@ def create_teacher():
     if user.role != 'guru':
         return jsonify({'error': 'Forbidden'}), 403
     data = request.json
-    username = data.get('username', '').strip()
+    username = data.get('username', '').strip() or data.get('campus', '').strip()
     email = data.get('email', '').strip().lower()
     full_name = data.get('full_name', '').strip()
+    campus = data.get('campus', '').strip() or username
+    department = data.get('department', '').strip()
+    semester = data.get('semester', '').strip()
     password = data.get('password', '')
 
     if not username or not email or not password:
-        return jsonify({'success': False, 'message': 'Username, email, dan password wajib diisi.'}), 400
+        return jsonify({'success': False, 'message': 'Username/Nama Kampus, email, dan password wajib diisi.'}), 400
     if User.query.filter_by(username=username).first():
-        return jsonify({'success': False, 'message': 'Username sudah digunakan.'}), 400
+        return jsonify({'success': False, 'message': 'Username/Nama Kampus sudah digunakan.'}), 400
     if User.query.filter_by(email=email).first():
         return jsonify({'success': False, 'message': 'Email sudah terdaftar.'}), 400
 
-    new_teacher = User(username=username, email=email, full_name=full_name if full_name else username, role='guru', is_approved=True)
+    new_teacher = User(
+        username=username,
+        email=email,
+        full_name=full_name if full_name else username,
+        campus=campus,
+        department=department,
+        semester=semester,
+        role='guru',
+        is_approved=True
+    )
     new_teacher.set_password(password)
     db.session.add(new_teacher)
     db.session.commit()
     return jsonify({'success': True, 'message': f'Mentor/Guru {new_teacher.display_name} berhasil ditambahkan!'})
+
+@app.route('/api/users/mentor-access', methods=['POST'])
+@teacher_required
+def mentor_access():
+    data = request.json or {}
+    mentor = db.session.get(User, data.get('mentor_id'))
+    password = data.get('password', '')
+    if not mentor or mentor.role != 'guru' or not mentor.is_approved or not mentor.check_password(password):
+        return jsonify({'success': False, 'message': 'Password mentor salah.'}), 401
+
+    return jsonify({
+        'success': True,
+        'token': generate_token(mentor),
+        'user': {
+            'id': mentor.id,
+            'username': mentor.username,
+            'email': mentor.email,
+            'full_name': mentor.full_name,
+            'department': mentor.department,
+            'role': mentor.role,
+            'display_name': mentor.display_name,
+            'name': mentor.display_name
+        }
+    })
 
 @app.route('/api/chat/<int:target_id>', methods=['GET'])
 @login_required
@@ -573,6 +685,13 @@ def get_chat(target_id):
         ((Message.sender_id == user.id) & (Message.receiver_id == target_id)) |
         ((Message.sender_id == target_id) & (Message.receiver_id == user.id))
     ).order_by(Message.timestamp.asc()).all()
+
+    unread_messages = [message for message in messages
+                       if message.receiver_id == user.id and not message.is_read]
+    for message in unread_messages:
+        message.is_read = True
+    if unread_messages:
+        db.session.commit()
     
     return jsonify([{
         'id': m.id,
@@ -582,6 +701,13 @@ def get_chat(target_id):
         'timestamp': m.timestamp.isoformat(),
         'is_read': m.is_read
     } for m in messages])
+
+@app.route('/api/chat/unread', methods=['GET'])
+@teacher_required
+def get_unread_chat_count():
+    user = get_current_user()
+    count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
+    return jsonify({'count': count})
 
 @app.route('/api/chat/<int:target_id>', methods=['POST'])
 @login_required

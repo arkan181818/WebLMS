@@ -121,11 +121,19 @@ export default function Chat({ user, onLogout }) {
                             {name}
                           </h4>
                         </div>
-                        <p className="text-xs text-slate-500 truncate">{c.email}</p>
-                        {user.role === 'murid' && (
-                          <span className="inline-block mt-0.5 text-[10px] text-violet-light bg-violet/10 px-1.5 py-0.5 rounded font-medium border border-violet/20">
-                            Guru / Mentor
-                          </span>
+                        {user.role === 'murid' ? (
+                          <div className="space-y-0.5 mt-0.5">
+                            <p className="text-[11px] text-primary-light font-medium truncate">
+                              🏫 {c.campus || c.username || 'Kampus'}
+                            </p>
+                            {(c.department || c.semester) && (
+                              <p className="text-[10px] text-slate-400 truncate">
+                                🎓 {c.department || 'Jurusan'}{c.semester ? ` • ${c.semester}` : ''}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 truncate">{c.email}</p>
                         )}
                       </div>
                     </button>
@@ -148,20 +156,34 @@ export default function Chat({ user, onLogout }) {
                 <p className="text-sm text-slate-400 max-w-sm">
                   {user.role === 'guru'
                     ? 'Klik nama murid di panel sebelah kiri untuk membalas konsultasi atau memberikan feedback.'
-                    : 'Pilih salah satu Mentor/Guru dari daftar di sebelah kiri untuk memulai sesi konsultasi 1-on-1.'}
+                    : 'Pilih salah satu Mentor/Guru dari daftar di sebelah kiri untuk melihat Kampus, Jurusan, Semester dan memulai sesi konsultasi 1-on-1.'}
                 </p>
               </div>
             ) : (
               <>
                 {/* Chat Header */}
-                <div className="bg-[#0B1120]/80 backdrop-blur-xl px-6 py-4 border-b border-white/[0.06] flex items-center gap-3 shrink-0">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary to-violet rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
-                    {(selectedContact.full_name || selectedContact.username || 'M').charAt(0)}
+                <div className="bg-[#0B1120]/80 backdrop-blur-xl px-6 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-gradient-to-br from-primary to-violet rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
+                      {(selectedContact.full_name || selectedContact.username || 'M').charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-base leading-snug">
+                        {selectedContact.full_name || selectedContact.username}
+                      </h3>
+                      {user.role === 'murid' && (
+                        <p className="text-xs text-slate-300 font-medium flex items-center gap-2">
+                          <span className="text-primary-light font-semibold">🏫 {selectedContact.campus || selectedContact.username}</span>
+                          {(selectedContact.department || selectedContact.semester) && (
+                            <span className="text-slate-400">• 🎓 {selectedContact.department || ''} {selectedContact.semester ? `(${selectedContact.semester})` : ''}</span>
+                          )}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-white">{selectedContact.full_name || selectedContact.username}</h3>
-                    <p className="text-xs text-slate-400">{selectedContact.email}</p>
-                  </div>
+                  <span className="text-xs text-slate-400 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                    {selectedContact.email}
+                  </span>
                 </div>
 
                 {/* Messages Container */}

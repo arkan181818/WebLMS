@@ -2,19 +2,24 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { UserCheck, UserX, Clock, Users, CheckCircle2, UserPlus, X, Save } from 'lucide-react';
+import { UserCheck, UserX, Clock, Users, CheckCircle2, UserPlus, X, Save, LockKeyhole } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 export default function Mentees({ user, onLogout }) {
   const [approvedStudents, setApprovedStudents] = useState([]);
+  const [mentors, setMentors] = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
+  const [selectedMentor, setSelectedMentor] = useState(null);
+  const [mentorPassword, setMentorPassword] = useState('');
+  const [isAccessingMentor, setIsAccessingMentor] = useState(false);
 
   // Form tambah mentor
   const [tUsername, setTUsername] = useState('');
   const [tEmail, setTEmail] = useState('');
   const [tFullName, setTFullName] = useState('');
+  const [tDepartment, setTDepartment] = useState('');
   const [tPassword, setTPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,12 +30,14 @@ export default function Mentees({ user, onLogout }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pendingRes, studentsRes] = await Promise.all([
+      const [pendingRes, studentsRes, mentorsRes] = await Promise.all([
         api.get('/api/users/pending'),
-        api.get('/api/users/students')
+        api.get('/api/users/students'),
+        api.get('/api/users/teachers')
       ]);
       setPendingUsers(pendingRes.data || []);
       setApprovedStudents(studentsRes.data || []);
+      setMentors(mentorsRes.data || []);
     } catch (err) {
       toast.error('Gagal mengambil data murid');
     } finally {
@@ -65,7 +72,7 @@ export default function Mentees({ user, onLogout }) {
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
     if (!tUsername || !tEmail || !tPassword) {
-      toast.error('Username, email, dan password wajib diisi');
+      toast.error('Nama kampus, email, dan password wajib diisi');
       return;
     }
     setIsSubmitting(true);
@@ -74,16 +81,36 @@ export default function Mentees({ user, onLogout }) {
         username: tUsername,
         email: tEmail,
         full_name: tFullName,
+        department: tDepartment,
         password: tPassword
       });
       toast.success(res.data.message);
       setShowTeacherModal(false);
-      setTUsername(''); setTEmail(''); setTFullName(''); setTPassword('');
+      setTUsername(''); setTEmail(''); setTFullName(''); setTDepartment(''); setTPassword('');
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal menambahkan mentor');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleMentorAccess = async (e) => {
+    e.preventDefault();
+    if (!selectedMentor || !mentorPassword) return;
+    setIsAccessingMentor(true);
+    try {
+      const res = await api.post('/api/users/mentor-access', {
+        mentor_id: selectedMentor.id,
+        password: mentorPassword
+      });
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      window.location.href = '/dashboard';
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Password mentor salah');
+    } finally {
+      setIsAccessingMentor(false);
     }
   };
 
@@ -117,6 +144,41 @@ export default function Mentees({ user, onLogout }) {
             <UserPlus size={18} /> Tambah Mentor Baru
           </motion.button>
         </motion.div>
+
+        <section className="glass-card p-6 mb-8">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-xl font-bold text-white">Daftar Mentor</h2>
+              <p className="text-sm text-slate-400 mt-1">Pilih nama mentor untuk masuk ke panelnya.</p>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-violet/15 border border-violet/30 text-violet-light text-xs font-bold">
+              {mentors.length} Mentor
+            </span>
+          </div>
+          {mentors.length === 0 ? (
+            <p className="text-slate-500 text-sm">Belum ada mentor yang terdaftar.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {mentors.map(mentor => (
+                <button
+                  key={mentor.id}
+                  onClick={() => { setSelectedMentor(mentor); setMentorPassword(''); }}
+                  className="text-left p-4 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:border-violet/50 hover:bg-violet/10 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet to-primary flex items-center justify-center text-white font-bold uppercase">
+                      {(mentor.full_name || mentor.username || 'M').charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-white truncate">{mentor.full_name || mentor.username}</h3>
+                      <p className="text-xs text-violet-light truncate">{mentor.department || 'Jurusan belum diisi'}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Layout Kanan & Kiri */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -275,14 +337,25 @@ export default function Mentees({ user, onLogout }) {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Jurusan</label>
+                    <input
+                      type="text"
+                      value={tDepartment}
+                      onChange={e => setTDepartment(e.target.value)}
+                      placeholder="Contoh: Teknik Informatika"
+                      className="input-field"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
-                      Username <span className="text-rose">*</span>
+                      Nama Kampus <span className="text-rose">*</span>
                     </label>
                     <input
                       type="text"
                       value={tUsername}
                       onChange={e => setTUsername(e.target.value)}
-                      placeholder="username_mentor"
+                      placeholder="Contoh: Kampus Nusantara"
                       className="input-field"
                       required
                     />
@@ -330,6 +403,49 @@ export default function Mentees({ user, onLogout }) {
                       <Save size={18} /> {isSubmitting ? 'Menyimpan...' : 'Tambah Mentor'}
                     </motion.button>
                   </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {selectedMentor && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="glass-card w-full max-w-md p-6"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Buka Panel Mentor</h2>
+                    <p className="text-sm text-slate-400 mt-1">{selectedMentor.full_name || selectedMentor.username}</p>
+                  </div>
+                  <button onClick={() => setSelectedMentor(null)} className="text-slate-400 hover:text-white p-1">
+                    <X size={20} />
+                  </button>
+                </div>
+                <form onSubmit={handleMentorAccess} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Password mentor</label>
+                    <div className="relative">
+                      <LockKeyhole size={17} className="absolute left-3 top-3 text-slate-500" />
+                      <input
+                        type="password"
+                        value={mentorPassword}
+                        onChange={e => setMentorPassword(e.target.value)}
+                        className="input-field pl-10"
+                        placeholder="Masukkan password"
+                        autoFocus
+                        required
+                      />
+                    </div>
+                  </div>
+                  <button type="submit" disabled={isAccessingMentor} className="btn btn-primary w-full">
+                    {isAccessingMentor ? 'Memeriksa...' : 'Buka Panel Mentor'}
+                  </button>
                 </form>
               </motion.div>
             </div>

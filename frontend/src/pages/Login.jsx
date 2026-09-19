@@ -13,6 +13,9 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
 
   const [regUsername, setRegUsername] = useState('');
+  const [regCampus, setRegCampus] = useState('');
+  const [regDepartment, setRegDepartment] = useState('');
+  const [regSemester, setRegSemester] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regFullName, setRegFullName] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -60,7 +63,10 @@ export default function Login({ onLogin }) {
     setIsLoading(true);
     try {
       const res = await api.post('/api/register', {
-        username: regUsername,
+        username: regCampus.trim() || regUsername.trim(),
+        campus: regCampus.trim(),
+        department: regDepartment.trim(),
+        semester: regSemester.trim(),
         email: regEmail,
         full_name: regFullName,
         password: regPassword,
@@ -70,7 +76,7 @@ export default function Login({ onLogin }) {
       if (res.data.success) {
         toast.success(res.data.message);
         setIsRegister(false);
-        setRegUsername(''); setRegEmail(''); setRegFullName(''); setRegPassword(''); setRegConfirm(''); setRegRole('murid');
+        setRegUsername(''); setRegCampus(''); setRegDepartment(''); setRegSemester(''); setRegEmail(''); setRegFullName(''); setRegPassword(''); setRegConfirm(''); setRegRole('murid');
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Pendaftaran gagal.');
@@ -203,11 +209,21 @@ export default function Login({ onLogin }) {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Nama Lengkap</label>
-                  <input type="text" value={regFullName} onChange={(e) => setRegFullName(e.target.value)} className="input-field" placeholder="Nama lengkap Anda" />
+                  <input type="text" value={regFullName} onChange={(e) => setRegFullName(e.target.value)} className="input-field" placeholder="Nama lengkap Anda (misal: Budi Santoso, S.Kom.)" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Username <span className="text-rose">*</span></label>
-                  <input type="text" value={regUsername} onChange={(e) => setRegUsername(e.target.value)} className="input-field" placeholder="username_baru" required />
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Nama Kampus / Universitas <span className="text-rose">*</span></label>
+                  <input type="text" value={regCampus} onChange={(e) => { setRegCampus(e.target.value); setRegUsername(e.target.value); }} className="input-field" placeholder="Contoh: Universitas Indonesia / ITB / UGM" required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Jurusan / Program Studi</label>
+                    <input type="text" value={regDepartment} onChange={(e) => setRegDepartment(e.target.value)} className="input-field" placeholder="Teknik Informatika..." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Semester</label>
+                    <input type="text" value={regSemester} onChange={(e) => setRegSemester(e.target.value)} className="input-field" placeholder="Contoh: Semester 6" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Email <span className="text-rose">*</span></label>

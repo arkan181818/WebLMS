@@ -12,6 +12,9 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(120), nullable=True)
+    department = db.Column(db.String(120), nullable=True)  # Jurusan
+    campus = db.Column(db.String(150), nullable=True)      # Nama Kampus
+    semester = db.Column(db.String(50), nullable=True)     # Semester
     role = db.Column(db.String(20), nullable=False, default='murid')  # 'guru' (admin) atau 'murid'
     is_approved = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)

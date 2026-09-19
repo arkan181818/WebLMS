@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { LogOut, Home, BookOpen, PenTool, MessageCircle, Users, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../lib/api';
@@ -6,6 +7,24 @@ import toast from 'react-hot-toast';
 
 export default function Sidebar({ user, onLogout }) {
   const location = useLocation();
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  useEffect(() => {
+    if (user.role !== 'guru') return undefined;
+
+    const fetchUnreadChatCount = async () => {
+      try {
+        const res = await api.get('/api/chat/unread');
+        setUnreadChatCount(res.data.count || 0);
+      } catch (err) {
+        // Ignore polling failures so navigation remains available.
+      }
+    };
+
+    fetchUnreadChatCount();
+    const interval = setInterval(fetchUnreadChatCount, 5000);
+    return () => clearInterval(interval);
+  }, [user.role]);
 
   const handleLogout = async () => {
     try {
@@ -61,7 +80,12 @@ export default function Sidebar({ user, onLogout }) {
                 }`}
               >
                 <span className={isActive ? 'text-primary-light' : ''}>{item.icon}</span>
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.path === '/chat' && user.role === 'guru' && unreadChatCount > 0 && (
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose text-white text-[11px] font-bold flex items-center justify-center">
+                    {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                  </span>
+                )}
               </Link>
             </motion.div>
           );
