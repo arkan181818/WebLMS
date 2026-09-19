@@ -129,7 +129,7 @@ def get_me():
         })
     return jsonify({'authenticated': False})
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
     data = request.json
     identifier = data.get('identifier', '').strip()
@@ -160,7 +160,7 @@ def login():
         })
     return jsonify({'success': False, 'message': 'Email/Username atau password salah.'}), 401
 
-@app.route('/api/profile/update', methods=['POST'])
+@app.route('/api/profile/update', methods=['POST', 'OPTIONS'])
 @login_required
 def update_profile():
     user = get_current_user()
@@ -203,7 +203,7 @@ def update_profile():
         }
     })
 
-@app.route('/api/register', methods=['POST'])
+@app.route('/api/register', methods=['POST', 'OPTIONS'])
 def register():
     try:
         data = request.json or {}
@@ -256,7 +256,7 @@ def register():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Gagal mendaftar: {str(e)}'}), 500
 
-@app.route('/api/logout', methods=['POST'])
+@app.route('/api/logout', methods=['POST', 'OPTIONS'])
 def logout():
     # With JWT, logout is handled client-side by removing the token
     return jsonify({'success': True, 'message': 'Anda telah berhasil keluar.'})
@@ -292,7 +292,7 @@ def get_pending_users():
         'created_at': u.created_at.isoformat()
     } for u in pending_users])
 
-@app.route('/api/users/<int:student_id>/approve', methods=['POST'])
+@app.route('/api/users/<int:student_id>/approve', methods=['POST', 'OPTIONS'])
 @login_required
 def approve_user(student_id):
     user = get_current_user()
@@ -307,7 +307,7 @@ def approve_user(student_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Akun berhasil disetujui.'})
 
-@app.route('/api/users/<int:student_id>/reject', methods=['POST'])
+@app.route('/api/users/<int:student_id>/reject', methods=['POST', 'OPTIONS'])
 @login_required
 def reject_user(student_id):
     user = get_current_user()
@@ -649,7 +649,7 @@ def get_teachers():
         'role': 'guru'
     } for t in teachers])
 
-@app.route('/api/users/create_teacher', methods=['POST'])
+@app.route('/api/users/create_teacher', methods=['POST', 'OPTIONS'])
 @login_required
 def create_teacher():
     user = get_current_user()
@@ -696,7 +696,7 @@ def create_teacher():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Gagal menambahkan mentor: {str(e)}'}), 500
 
-@app.route('/api/users/mentor-access', methods=['POST'])
+@app.route('/api/users/mentor-access', methods=['POST', 'OPTIONS'])
 @teacher_required
 def mentor_access():
     data = request.json or {}
@@ -752,7 +752,7 @@ def get_unread_chat_count():
     count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
     return jsonify({'count': count})
 
-@app.route('/api/chat/<int:target_id>', methods=['POST'])
+@app.route('/api/chat/<int:target_id>', methods=['POST', 'OPTIONS'])
 @login_required
 def send_message(target_id):
     user = get_current_user()
