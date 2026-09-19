@@ -188,40 +188,56 @@ def update_profile():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.json
-    username = data.get('username', '').strip() or data.get('campus', '').strip()
-    email = data.get('email', '').strip().lower()
-    full_name = data.get('full_name', '').strip()
-    campus = data.get('campus', '').strip() or username
-    department = data.get('department', '').strip()
-    semester = data.get('semester', '').strip()
-    password = data.get('password', '')
-    confirm_password = data.get('confirm_password', '')
-    role = data.get('role', 'murid')
-    if role not in ['murid', 'guru']:
-        role = 'murid'
+    try:
+        data = request.json or {}
+        campus = data.get('campus', '').strip() or data.get('username', '').strip()
+        raw_username = data.get('username', '').strip() or campus
+        email = data.get('email', '').strip().lower()
+        full_name = data.get('full_name', '').strip()
+        department = data.get('department', '').strip()
+        semester = data.get('semester', '').strip()
+        password = data.get('password', '')
+        confirm_password = data.get('confirm_password', '')
+        role = data.get('role', 'murid')
+        if role not in ['murid', 'guru']:
+            role = 'murid'
 
-    if not username or not email or not password:
-        return jsonify({'success': False, 'message': 'Harap isi semua kolom yang wajib.'}), 400
-    if password != confirm_password:
-        return jsonify({'success': False, 'message': 'Konfirmasi password tidak cocok.'}), 400
-    if len(password) < 6:
-        return jsonify({'success': False, 'message': 'Password minimal harus terdiri dari 6 karakter.'}), 400
+        if not campus or not email or not password:
+            return jsonify({'success': False, 'message': 'Harap isi semua kolom yang wajib.'}), 400
+        if password != confirm_password:
+            return jsonify({'success': False, 'message': 'Konfirmasi password tidak cocok.'}), 400
+        if len(password) < 6:
+            return jsonify({'success': False, 'message': 'Password minimal harus terdiri dari 6 karakter.'}), 400
 
-    if User.query.filter_by(username=username).first():
-        return jsonify({'success': False, 'message': 'Username / Nama Kampus sudah digunakan.'}), 400
-    if User.query.filter_by(email=email).first():
-        return jsonify({'success': False, 'message': 'Email sudah terdaftar.'}), 400
+        if User.query.filter_by(email=email).first():
+            return jsonify({'success': False, 'message': 'Email sudah terdaftar. Silakan gunakan email lain.'}), 400
 
-    new_user = User(
-        username=username, email=email, full_name=full_name if full_name else username,
-        campus=campus, department=department, semester=semester, role=role, is_approved=False
-    )
-    new_user.set_password(password)
-    db.session.add(new_user)
-    db.session.commit()
-    msg = 'Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan dari Admin/Guru.'
-    return jsonify({'success': True, 'message': msg})
+        base_username = email.split('@')[0] if email else (raw_username or 'user')
+        clean_username = re.sub(r'[^a-zA-Z0-9_]', '_', base_username)[:50]
+        final_username = clean_username
+        counter = 1
+        while User.query.filter_by(username=final_username).first():
+            final_username = f"{clean_username}_{counter}"
+            counter += 1
+
+        new_user = User(
+            username=final_username,
+            email=email,
+            full_name=full_name if full_name else campus,
+            campus=campus,
+            department=department,
+            semester=semester,
+            role=role,
+            is_approved=False
+        )
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        msg = 'Pendaftaran berhasil! Akun Anda sedang menunggu persetujuan dari Admin/Guru.'
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Gagal mendaftar: {str(e)}'}), 500
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
@@ -622,36 +638,46 @@ def create_teacher():
     user = get_current_user()
     if user.role != 'guru':
         return jsonify({'error': 'Forbidden'}), 403
-    data = request.json
-    username = data.get('username', '').strip() or data.get('campus', '').strip()
-    email = data.get('email', '').strip().lower()
-    full_name = data.get('full_name', '').strip()
-    campus = data.get('campus', '').strip() or username
-    department = data.get('department', '').strip()
-    semester = data.get('semester', '').strip()
-    password = data.get('password', '')
+    try:
+        data = request.json or {}
+        campus = data.get('campus', '').strip() or data.get('username', '').strip()
+        raw_username = data.get('username', '').strip() or campus
+        email = data.get('email', '').strip().lower()
+        full_name = data.get('full_name', '').strip()
+        department = data.get('department', '').strip()
+        semester = data.get('semester', '').strip()
+        password = data.get('password', '')
 
-    if not username or not email or not password:
-        return jsonify({'success': False, 'message': 'Username/Nama Kampus, email, dan password wajib diisi.'}), 400
-    if User.query.filter_by(username=username).first():
-        return jsonify({'success': False, 'message': 'Username/Nama Kampus sudah digunakan.'}), 400
-    if User.query.filter_by(email=email).first():
-        return jsonify({'success': False, 'message': 'Email sudah terdaftar.'}), 400
+        if not campus or not email or not password:
+            return jsonify({'success': False, 'message': 'Nama Kampus, email, dan password wajib diisi.'}), 400
+        if User.query.filter_by(email=email).first():
+            return jsonify({'success': False, 'message': 'Email sudah terdaftar. Silakan gunakan email lain.'}), 400
 
-    new_teacher = User(
-        username=username,
-        email=email,
-        full_name=full_name if full_name else username,
-        campus=campus,
-        department=department,
-        semester=semester,
-        role='guru',
-        is_approved=True
-    )
-    new_teacher.set_password(password)
-    db.session.add(new_teacher)
-    db.session.commit()
-    return jsonify({'success': True, 'message': f'Mentor/Guru {new_teacher.display_name} berhasil ditambahkan!'})
+        base_username = email.split('@')[0] if email else (raw_username or 'mentor')
+        clean_username = re.sub(r'[^a-zA-Z0-9_]', '_', base_username)[:50]
+        final_username = clean_username
+        counter = 1
+        while User.query.filter_by(username=final_username).first():
+            final_username = f"{clean_username}_{counter}"
+            counter += 1
+
+        new_teacher = User(
+            username=final_username,
+            email=email,
+            full_name=full_name if full_name else campus,
+            campus=campus,
+            department=department,
+            semester=semester,
+            role='guru',
+            is_approved=True
+        )
+        new_teacher.set_password(password)
+        db.session.add(new_teacher)
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Mentor/Guru {new_teacher.display_name} berhasil ditambahkan!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Gagal menambahkan mentor: {str(e)}'}), 500
 
 @app.route('/api/users/mentor-access', methods=['POST'])
 @teacher_required

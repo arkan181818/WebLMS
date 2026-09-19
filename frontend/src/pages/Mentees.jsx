@@ -20,6 +20,7 @@ export default function Mentees({ user, onLogout }) {
   const [tEmail, setTEmail] = useState('');
   const [tFullName, setTFullName] = useState('');
   const [tDepartment, setTDepartment] = useState('');
+  const [tSemester, setTSemester] = useState('');
   const [tPassword, setTPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,17 +80,22 @@ export default function Mentees({ user, onLogout }) {
     try {
       const res = await api.post('/api/users/create_teacher', {
         username: tUsername,
+        campus: tUsername,
         email: tEmail,
         full_name: tFullName,
         department: tDepartment,
+        semester: tSemester,
         password: tPassword
       });
       toast.success(res.data.message);
       setShowTeacherModal(false);
-      setTUsername(''); setTEmail(''); setTFullName(''); setTDepartment(''); setTPassword('');
+      setTUsername(''); setTEmail(''); setTFullName(''); setTDepartment(''); setTSemester(''); setTPassword('');
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal menambahkan mentor');
+      const errMsg = typeof err.response?.data === 'string'
+        ? 'Gagal terhubung ke server (500). Pastikan backend sudah di-update di VPS.'
+        : (err.response?.data?.message || err.message || 'Gagal menambahkan mentor');
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -342,7 +348,18 @@ export default function Mentees({ user, onLogout }) {
                       type="text"
                       value={tDepartment}
                       onChange={e => setTDepartment(e.target.value)}
-                      placeholder="Contoh: Teknik Informatika"
+                      placeholder="Contoh: D4 Teknik Informatika"
+                      className="input-field"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Semester</label>
+                    <input
+                      type="text"
+                      value={tSemester}
+                      onChange={e => setTSemester(e.target.value)}
+                      placeholder="Contoh: Semester 6"
                       className="input-field"
                     />
                   </div>
