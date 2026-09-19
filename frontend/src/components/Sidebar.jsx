@@ -8,9 +8,10 @@ import toast from 'react-hot-toast';
 export default function Sidebar({ user, onLogout }) {
   const location = useLocation();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const isGuru = user?.role === 'guru';
 
   useEffect(() => {
-    if (user.role !== 'guru') return undefined;
+    if (!isGuru) return undefined;
 
     const fetchUnreadChatCount = async () => {
       try {
@@ -24,7 +25,7 @@ export default function Sidebar({ user, onLogout }) {
     fetchUnreadChatCount();
     const interval = setInterval(fetchUnreadChatCount, 5000);
     return () => clearInterval(interval);
-  }, [user.role]);
+  }, [isGuru]);
 
   const handleLogout = async () => {
     try {
@@ -39,7 +40,7 @@ export default function Sidebar({ user, onLogout }) {
     }
   };
 
-  const navItems = user.role === 'guru' ? [
+  const navItems = isGuru ? [
     { icon: <Home size={20} />, label: 'Dashboard', path: '/dashboard' },
     { icon: <Users size={20} />, label: 'Daftar Murid', path: '/mentees' },
     { icon: <BookOpen size={20} />, label: 'Kelola Materi', path: '/materials' },
@@ -61,7 +62,7 @@ export default function Sidebar({ user, onLogout }) {
         </div>
         <div>
           <h1 className="font-bold text-white text-lg leading-tight">RuangBelajar</h1>
-          <span className="text-[10px] text-primary-light font-semibold uppercase tracking-widest">{user.role} Panel</span>
+          <span className="text-[10px] text-primary-light font-semibold uppercase tracking-widest">{user?.role || 'User'} Panel</span>
         </div>
       </div>
 
@@ -81,7 +82,7 @@ export default function Sidebar({ user, onLogout }) {
               >
                 <span className={isActive ? 'text-primary-light' : ''}>{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
-                {item.path === '/chat' && user.role === 'guru' && unreadChatCount > 0 && (
+                {item.path === '/chat' && isGuru && unreadChatCount > 0 && (
                   <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose text-white text-[11px] font-bold flex items-center justify-center">
                     {unreadChatCount > 99 ? '99+' : unreadChatCount}
                   </span>

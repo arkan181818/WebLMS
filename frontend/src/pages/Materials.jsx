@@ -96,13 +96,15 @@ export default function Materials({ user, onLogout }) {
     return `${baseUrl}/uploads/${filename}`;
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="page-bg flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
+
+  const isGuru = user?.role === 'guru';
 
   return (
     <div className="page-bg flex">
@@ -116,13 +118,13 @@ export default function Materials({ user, onLogout }) {
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white">
-              {user.role === 'guru' ? 'Kelola Materi Pembelajaran' : 'Materi Pembelajaran'}
+              {isGuru ? 'Kelola Materi Pembelajaran' : 'Materi Pembelajaran'}
             </h1>
             <p className="text-slate-400 mt-2">
-              {user.role === 'guru' ? 'Buat dan bagikan modul/file materi untuk murid Anda.' : 'Akses modul materi dan dokumen pembelajaran dari mentor Anda.'}
+              {isGuru ? 'Buat dan bagikan modul/file materi untuk murid Anda.' : 'Akses modul materi dan dokumen pembelajaran dari mentor Anda.'}
             </p>
           </div>
-          {user.role === 'guru' && (
+          {isGuru && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -156,7 +158,7 @@ export default function Materials({ user, onLogout }) {
                     <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary-light text-xs font-semibold">
                       {materi.subject_name || 'Umum'}
                     </span>
-                    {user.role === 'murid' && (
+                    {!isGuru && (
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-md flex items-center gap-1 ${materi.is_completed ? 'bg-secondary/15 text-secondary border border-secondary/20' : 'bg-white/5 text-slate-500'}`}>
                         {materi.is_completed ? <CheckCircle size={12} /> : <Circle size={12} />}
                         {materi.is_completed ? 'Selesai' : 'Belum'}
