@@ -125,7 +125,15 @@ def login():
             'success': True,
             'message': f'Selamat datang kembali, {user.display_name}!',
             'token': token,
-            'user': {'id': user.id, 'role': user.role, 'name': user.display_name}
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'display_name': user.display_name,
+                'name': user.display_name
+            }
         })
     return jsonify({'success': False, 'message': 'Email/Username atau password salah.'}), 401
 
@@ -312,8 +320,32 @@ def get_material_detail(id):
         'video_url': material.get_youtube_embed_url(),
         'subject_name': material.subject.name if material.subject else '',
         'is_completed': progress.is_completed if progress else False,
-        'attachment': material.attachment_original_name if material.attachment_filename else None
+        'attachment': material.attachment_original_name if material.attachment_filename else None,
+        'attachment_url': f"/uploads/{material.attachment_filename}" if material.attachment_filename else None
     })
+
+@app.route('/uploads/<path:filename>', methods=['GET'])
+def serve_upload_file(filename):
+    return send_from_directory(os.path.join(app.root_path, 'uploads'), filename)
+
+def get_or_create_subject(subject_input):
+    if not subject_input:
+        return None
+    # Jika dikirim ID numerik
+    if isinstance(subject_input, int) or (isinstance(subject_input, str) and subject_input.isdigit()):
+        subj = db.session.get(Subject, int(subject_input))
+        if subj:
+            return subj
+    name = str(subject_input).strip()
+    if not name:
+        return None
+    subj = Subject.query.filter(db.func.lower(Subject.name) == db.func.lower(name)).first()
+    if not subj:
+        code = re.sub(r'[^A-Z0-9]', '', name.upper())[:6] or 'SUBJ'
+        subj = Subject(name=name, code=code, description=f"Mata pelajaran {name}")
+        db.session.add(subj)
+        db.session.commit()
+    return subj
 
 @app.route('/api/materials/create', methods=['POST'])
 @login_required
@@ -321,15 +353,43 @@ def create_material():
     user = get_current_user()
     if user.role != 'guru':
         return jsonify({'error': 'Forbidden'}), 403
-    data = request.json
+
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+
     title = data.get('title', '').strip()
     content = data.get('content', '').strip()
     summary = data.get('summary', '').strip()
-    subject_id = data.get('subject_id')
+    subject_input = data.get('subject_name') or data.get('subject_id')
     video_url = data.get('video_url', '').strip() or None
-    if not title or not content or not subject_id:
+
+    if not title or not content or not subject_input:
         return jsonify({'error': 'Bad Request', 'message': 'Judul, konten, dan mata pelajaran wajib diisi.'}), 400
-    m = Material(title=title, content=content, summary=summary, subject_id=subject_id, teacher_id=user.id, video_url=video_url)
+
+    subject = get_or_create_subject(subject_input)
+    if not subject:
+        return jsonify({'error': 'Bad Request', 'message': 'Mata pelajaran tidak valid.'}), 400
+
+    attachment_filename = None
+    attachment_original_name = None
+
+    if 'file' in request.files and request.files['file'].filename:
+        file = request.files['file']
+        original_name = file.filename
+        safe_name = secure_filename(f"mat_{user.id}_{int(datetime.now().timestamp())}_{original_name}")
+        upload_dir = os.path.join(app.root_path, 'uploads', 'materials')
+        os.makedirs(upload_dir, exist_ok=True)
+        file.save(os.path.join(upload_dir, safe_name))
+        attachment_filename = f"materials/{safe_name}"
+        attachment_original_name = original_name
+
+    m = Material(
+        title=title, content=content, summary=summary,
+        subject_id=subject.id, teacher_id=user.id, video_url=video_url,
+        attachment_filename=attachment_filename, attachment_original_name=attachment_original_name
+    )
     db.session.add(m)
     db.session.commit()
     return jsonify({'success': True, 'message': 'Materi berhasil dibuat.'}), 201
@@ -387,6 +447,8 @@ def get_assignments():
             'status': status,
             'grade': grade,
             'feedback': feedback,
+            'attachment': a.attachment_original_name if a.attachment_filename else None,
+            'attachment_url': f"/uploads/{a.attachment_filename}" if a.attachment_filename else None,
             'created_at': a.created_at.isoformat()
         })
     return jsonify(data)
@@ -397,10 +459,15 @@ def create_assignment():
     user = get_current_user()
     if user.role != 'guru':
         return jsonify({'error': 'Forbidden'}), 403
-    data = request.json
+
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+
     title = data.get('title', '').strip()
     description = data.get('description', '').strip()
-    subject_id = data.get('subject_id')
+    subject_input = data.get('subject_name') or data.get('subject_id')
     due_date_str = data.get('due_date')
     due_date = None
     if due_date_str:
@@ -408,9 +475,32 @@ def create_assignment():
             due_date = datetime.fromisoformat(due_date_str)
         except ValueError:
             pass
-    if not title or not description or not subject_id:
+
+    if not title or not description or not subject_input:
         return jsonify({'error': 'Bad Request', 'message': 'Judul, deskripsi, dan mata pelajaran wajib diisi.'}), 400
-    a = Assignment(title=title, description=description, subject_id=subject_id, teacher_id=user.id, due_date=due_date)
+
+    subject = get_or_create_subject(subject_input)
+    if not subject:
+        return jsonify({'error': 'Bad Request', 'message': 'Mata pelajaran tidak valid.'}), 400
+
+    attachment_filename = None
+    attachment_original_name = None
+
+    if 'file' in request.files and request.files['file'].filename:
+        file = request.files['file']
+        original_name = file.filename
+        safe_name = secure_filename(f"asg_{user.id}_{int(datetime.now().timestamp())}_{original_name}")
+        upload_dir = os.path.join(app.root_path, 'uploads', 'assignments')
+        os.makedirs(upload_dir, exist_ok=True)
+        file.save(os.path.join(upload_dir, safe_name))
+        attachment_filename = f"assignments/{safe_name}"
+        attachment_original_name = original_name
+
+    a = Assignment(
+        title=title, description=description, subject_id=subject.id,
+        teacher_id=user.id, due_date=due_date,
+        attachment_filename=attachment_filename, attachment_original_name=attachment_original_name
+    )
     db.session.add(a)
     db.session.commit()
     return jsonify({'success': True, 'message': 'Tugas berhasil dibuat.'}), 201

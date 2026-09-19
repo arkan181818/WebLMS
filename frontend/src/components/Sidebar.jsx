@@ -69,23 +69,28 @@ export default function Sidebar({ user, onLogout }) {
       </div>
 
       {/* User info */}
-      <div className="p-4 border-t border-white/[0.06]">
-        <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-cyan rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
-            {user.display_name ? user.display_name.charAt(0) : '?'}
+      {(() => {
+        const displayName = user?.display_name || user?.name || user?.full_name || user?.username || 'User';
+        return (
+          <div className="p-4 border-t border-white/[0.06]">
+            <div className="flex items-center gap-3 mb-4 px-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-cyan rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
+                {displayName.charAt(0)}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <h4 className="text-sm font-bold text-white truncate">{displayName}</h4>
+                <p className="text-xs text-slate-500 truncate capitalize">{user?.role}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-rose/80 hover:text-white hover:bg-rose/20 rounded-xl transition-all duration-300 font-medium text-sm border border-transparent hover:border-rose/30"
+            >
+              <LogOut size={18} /> Keluar
+            </button>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <h4 className="text-sm font-bold text-white truncate">{user.display_name}</h4>
-            <p className="text-xs text-slate-500 truncate capitalize">{user.role}</p>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-rose/80 hover:text-white hover:bg-rose/20 rounded-xl transition-all duration-300 font-medium text-sm border border-transparent hover:border-rose/30"
-        >
-          <LogOut size={18} /> Keluar
-        </button>
-      </div>
+        );
+      })()}
     </div>
   );
 }
