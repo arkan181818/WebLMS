@@ -36,7 +36,9 @@ export default function Login({ onLogin }) {
           localStorage.setItem('token', res.data.token);
         }
         toast.success(res.data.message);
-        await onLogin();
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 600);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal masuk. Silakan coba lagi.');
