@@ -28,6 +28,8 @@ def _add_missing_user_columns():
         inspector = inspect(db.engine)
         if inspector.has_table('users'):
             columns = {column['name'] for column in inspector.get_columns('users')}
+            if 'is_approved' not in columns:
+                db.session.execute(text('ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT 1'))
             if 'department' not in columns:
                 db.session.execute(text('ALTER TABLE users ADD COLUMN department VARCHAR(120)'))
             if 'campus' not in columns:

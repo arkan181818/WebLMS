@@ -15,7 +15,7 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'elearning-secret-key-super-secure-2026')
 
-db_uri = os.environ.get('DATABASE_URL', 'sqlite:///elearning.db')
+db_uri = os.environ.get('DATABASE_URL', 'sqlite:///elearning.db').strip()
 if db_uri.startswith("postgres://"):
     db_uri = db_uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
@@ -501,17 +501,6 @@ def toggle_material(id):
     db.session.commit()
     return jsonify({'success': True, 'is_completed': progress.is_completed})
 
-@app.route('/api/users/teachers', methods=['GET'])
-@login_required
-def get_teachers():
-    teachers = User.query.filter_by(role='guru', is_approved=True).all()
-    return jsonify([{
-        'id': t.id,
-        'username': t.username,
-        'full_name': t.display_name,
-        'email': t.email,
-        'department': t.department
-    } for t in teachers])
 
 @app.route('/api/assignments', methods=['GET'])
 @login_required
