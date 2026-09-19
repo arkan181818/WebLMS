@@ -23,6 +23,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+@app.before_request
+def handle_preflight():
+    if request.method == 'OPTIONS':
+        response = app.make_default_options_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+        return response
+
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -75,6 +84,8 @@ def get_current_user():
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
         user = get_current_user()
         if not user:
             return jsonify({'error': 'Unauthorized', 'message': 'Silakan masuk terlebih dahulu.'}), 401
@@ -84,6 +95,8 @@ def login_required(f):
 def teacher_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
         user = get_current_user()
         if not user:
             return jsonify({'error': 'Unauthorized', 'message': 'Silakan masuk terlebih dahulu.'}), 401
