@@ -135,7 +135,11 @@ def login():
     identifier = data.get('identifier', '').strip()
     password = data.get('password', '')
 
-    user = User.query.filter((User.email == identifier) | (User.username == identifier)).first()
+    # Coba query dengan email (case-insensitive) ATAU username
+    identifier_lower = identifier.lower()
+    user = User.query.filter(
+        (db.func.lower(User.email) == identifier_lower) | (User.username == identifier)
+    ).first()
     if user and user.check_password(password):
         if not user.is_approved:
             return jsonify({'success': False, 'message': 'Akun Anda sedang menunggu persetujuan dari Guru/Admin.'}), 403
