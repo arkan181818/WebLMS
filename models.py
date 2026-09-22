@@ -80,6 +80,7 @@ class Material(db.Model):
 
     # Relasi
     progress_entries = db.relationship('MaterialProgress', backref='material', lazy=True, cascade="all, delete-orphan")
+    attachments = db.relationship('MaterialAttachment', backref='material', lazy=True, cascade='all, delete-orphan')
 
     def get_youtube_embed_url(self):
         """Konversi berbagai format URL YouTube menjadi format embed aman"""
@@ -103,6 +104,21 @@ class Material(db.Model):
 
     def __repr__(self):
         return f'<Material {self.title}>'
+
+
+class MaterialAttachment(db.Model):
+    """Menyimpan lampiran file untuk sebuah materi (mendukung banyak file)."""
+    __tablename__ = 'material_attachments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)       # nama file tersimpan di disk
+    original_name = db.Column(db.String(255), nullable=False)  # nama file asli dari pengguna
+    file_size = db.Column(db.Integer, nullable=True)           # ukuran dalam bytes
+    uploaded_at = db.Column(db.DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f'<MaterialAttachment {self.original_name} -> Material:{self.material_id}>'
 
 
 class MaterialProgress(db.Model):

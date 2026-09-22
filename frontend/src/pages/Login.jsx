@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GraduationCap, LogIn, UserPlus, ArrowLeft, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -7,6 +7,7 @@ import api from '../lib/api';
 
 export default function Login({ onLogin }) {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
 
   const [identifier, setIdentifier] = useState('');
@@ -74,9 +75,9 @@ export default function Login({ onLogin }) {
         role: regRole,
       });
       if (res.data.success) {
-        toast.success(res.data.message);
-        setIsRegister(false);
-        setRegUsername(''); setRegCampus(''); setRegDepartment(''); setRegSemester(''); setRegEmail(''); setRegFullName(''); setRegPassword(''); setRegConfirm(''); setRegRole('murid');
+        toast.success(res.data.message || 'Pendaftaran berhasil! Tunggu persetujuan dari Guru/Admin.');
+        // Navigate ke /login tanpa query param agar useEffect tidak reset ke form register
+        navigate('/login', { replace: true });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Pendaftaran gagal.');

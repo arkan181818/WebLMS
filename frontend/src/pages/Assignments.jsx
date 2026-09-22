@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { PenTool, Plus, X, Save, Upload, Clock, CheckCircle, AlertTriangle, FileText, Download, Paperclip } from 'lucide-react';
+import { PenTool, Plus, X, Save, Upload, Clock, CheckCircle, AlertTriangle, FileText, Download, Paperclip, Star, Users, Award } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 export default function Assignments({ user, onLogout }) {
@@ -23,6 +23,12 @@ export default function Assignments({ user, onLogout }) {
   const [formDueDate, setFormDueDate] = useState('');
   const [formFile, setFormFile] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Teacher grading states
+  const [submissions, setSubmissions] = useState(null);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [gradeInputs, setGradeInputs] = useState({});
+  const [savingGrade, setSavingGrade] = useState({});
 
   useEffect(() => {
     fetchAssignments();
@@ -97,6 +103,59 @@ export default function Assignments({ user, onLogout }) {
     if (urlPath.startsWith('http')) return urlPath;
     const baseUrl = import.meta.env.VITE_API_URL || '';
     return `${baseUrl}${urlPath.startsWith('/') ? '' : '/'}${urlPath}`;
+  };
+
+  const openAssignmentDetail = async (asg) => {
+    setSelectedAssignment(asg);
+    setSubmissions(null);
+    setGradeInputs({});
+    if (asg && user?.role === 'guru') {
+      setLoadingSubmissions(true);
+      try {
+        const res = await api.get(`/api/assignments/${asg.id}/submissions`);
+        setSubmissions(res.data);
+        const prefill = {};
+        res.data.submissions.forEach(s => {
+          prefill[s.submission_id] = {
+            grade: s.grade !== null && s.grade !== undefined ? String(s.grade) : '',
+            feedback: s.feedback || ''
+          };
+        });
+        setGradeInputs(prefill);
+      } catch {
+        toast.error('Gagal memuat data submission');
+      } finally {
+        setLoadingSubmissions(false);
+      }
+    }
+  };
+
+  const handleGrade = async (submissionId) => {
+    const input = gradeInputs[submissionId] || {};
+    if (input.grade === '' || input.grade === undefined) {
+      toast.error('Masukkan nilai terlebih dahulu');
+      return;
+    }
+    setSavingGrade(prev => ({ ...prev, [submissionId]: true }));
+    try {
+      const res = await api.post(`/api/submissions/${submissionId}/grade`, {
+        grade: Number(input.grade),
+        feedback: input.feedback || ''
+      });
+      toast.success(res.data.message);
+      setSubmissions(prev => ({
+        ...prev,
+        submissions: prev.submissions.map(s =>
+          s.submission_id === submissionId
+            ? { ...s, grade: Number(input.grade), feedback: input.feedback, is_graded: true }
+            : s
+        )
+      }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menyimpan nilai');
+    } finally {
+      setSavingGrade(prev => ({ ...prev, [submissionId]: false }));
+    }
   };
 
   if (loading || !user) {
@@ -195,7 +254,7 @@ export default function Assignments({ user, onLogout }) {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedAssignment(asg)}
+                    onClick={() => openAssignmentDetail(asg)}
                     className="btn btn-primary py-1.5 px-3 text-xs flex items-center gap-1.5"
                   >
                     {user.role === 'guru' ? 'Lihat Detail' : (asg.status === 'not_submitted' ? 'Kumpulkan' : 'Lihat Status')}
@@ -414,8 +473,132 @@ export default function Assignments({ user, onLogout }) {
                   </div>
                 )}
 
+                {/* GURU: Panel Penilaian Submission */}
+                {user.role === 'guru' && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2 mb-3">
+                      <Users size={16} className="text-primary-light" />
+                      Pengumpulan Murid
+                    </h4>
+
+                    {loadingSubmissions ? (
+                      <div className="py-6 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                        Memuat data pengumpulan...
+                      </div>
+                    ) : submissions ? (
+                      <div className="space-y-3">
+                        {submissions.submissions.length === 0 && (
+                          <p className="text-slate-500 text-sm text-center py-6 bg-white/[0.02] rounded-xl border border-white/[0.05]">
+                            Belum ada murid yang mengumpulkan tugas ini.
+                          </p>
+                        )}
+
+                        {submissions.submissions.map(sub => (
+                          <div key={sub.submission_id} className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.08] space-y-3">
+                            {/* Info Murid & Tombol Unduh */}
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary-light">
+                                  {sub.student_name.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-sm font-semibold text-white">{sub.student_name}</span>
+                                {sub.is_late && (
+                                  <span className="text-xs bg-rose/15 text-rose border border-rose/30 px-2 py-0.5 rounded-md">Terlambat</span>
+                                )}
+                                {sub.is_graded && (
+                                  <span className="text-xs bg-secondary/15 text-secondary border border-secondary/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <Award size={10} /> Nilai: {sub.grade}
+                                  </span>
+                                )}
+                              </div>
+                              <a
+                                href={getFileUrl(sub.file_url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs text-primary-light border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-all"
+                              >
+                                <Download size={12} /> Unduh File ({sub.file_name})
+                              </a>
+                            </div>
+
+                            {sub.note && (
+                              <p className="text-xs text-slate-400 italic bg-black/20 px-3 py-2 rounded-lg">"{sub.note}"</p>
+                            )}
+
+                            <p className="text-xs text-slate-500">
+                              Dikirim: {new Date(sub.submitted_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+
+                            {/* Form Input Nilai */}
+                            <div className="flex gap-2 items-end pt-2 border-t border-white/[0.06]">
+                              <div className="flex-shrink-0">
+                                <label className="block text-xs text-slate-400 mb-1">Nilai (0–100)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={gradeInputs[sub.submission_id]?.grade ?? ''}
+                                  onChange={e => setGradeInputs(prev => ({
+                                    ...prev,
+                                    [sub.submission_id]: { ...prev[sub.submission_id], grade: e.target.value }
+                                  }))}
+                                  className="input-field text-sm w-24 text-center"
+                                  placeholder="0-100"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-xs text-slate-400 mb-1">Feedback (Opsional)</label>
+                                <input
+                                  type="text"
+                                  value={gradeInputs[sub.submission_id]?.feedback ?? ''}
+                                  onChange={e => setGradeInputs(prev => ({
+                                    ...prev,
+                                    [sub.submission_id]: { ...prev[sub.submission_id], feedback: e.target.value }
+                                  }))}
+                                  className="input-field text-sm"
+                                  placeholder="Catatan untuk murid..."
+                                />
+                              </div>
+                              <motion.button
+                                whileHover={{ scale: 1.03 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => handleGrade(sub.submission_id)}
+                                disabled={!!savingGrade[sub.submission_id]}
+                                className="btn btn-primary py-2 px-3 text-xs flex items-center gap-1.5 flex-shrink-0"
+                              >
+                                <Star size={13} />
+                                {savingGrade[sub.submission_id] ? 'Menyimpan...' : 'Simpan Nilai'}
+                              </motion.button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Murid Belum Mengumpulkan */}
+                        {submissions.not_submitted.length > 0 && (
+                          <div className="mt-3 p-3 rounded-xl bg-rose/5 border border-rose/20">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                              Belum Mengumpulkan ({submissions.not_submitted.length})
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {submissions.not_submitted.map(st => (
+                                <span key={st.student_id} className="text-xs bg-rose/10 text-rose border border-rose/20 px-2.5 py-1 rounded-full">
+                                  {st.student_name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-white/[0.08] flex justify-end">
-                  <button onClick={() => setSelectedAssignment(null)} className="btn bg-white/5 hover:bg-white/10 text-slate-300">
+                  <button
+                    onClick={() => { setSelectedAssignment(null); setSubmissions(null); }}
+                    className="btn bg-white/5 hover:bg-white/10 text-slate-300"
+                  >
                     Tutup
                   </button>
                 </div>

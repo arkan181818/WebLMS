@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify, send_from_directory, abort
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from flask_cors import CORS
-from models import db, User, Subject, Material, MaterialProgress, Assignment, Submission, Message
+from models import db, User, Subject, Material, MaterialProgress, MaterialAttachment, Assignment, Submission, Message
 from database import init_db
 
 load_dotenv()
@@ -404,6 +404,27 @@ def get_material_detail(id):
         progress.last_accessed = datetime.now()
         db.session.commit()
 
+    base_url = os.environ.get('VITE_API_URL', '')
+
+    def att_data(att):
+        url = f"{base_url}/uploads/{att.filename}"
+        return {
+            'id': att.id,
+            'name': att.original_name,
+            'url': url,
+            'size': att.file_size
+        }
+
+    # Kumpulkan semua lampiran: dari tabel baru + kolom lama (backward-compat)
+    attachments = [att_data(a) for a in material.attachments]
+    if not attachments and material.attachment_filename:
+        attachments = [{
+            'id': None,
+            'name': material.attachment_original_name or material.attachment_filename,
+            'url': f"{base_url}/uploads/{material.attachment_filename}",
+            'size': None
+        }]
+
     return jsonify({
         'id': material.id,
         'title': material.title,
@@ -411,8 +432,10 @@ def get_material_detail(id):
         'video_url': material.get_youtube_embed_url(),
         'subject_name': material.subject.name if material.subject else '',
         'is_completed': progress.is_completed if progress else False,
+        'attachments': attachments,
+        # Backward-compat (single)
         'attachment': material.attachment_original_name if material.attachment_filename else None,
-        'attachment_url': f"/uploads/{material.attachment_filename}" if material.attachment_filename else None
+        'attachment_url': f"{base_url}/uploads/{material.attachment_filename}" if material.attachment_filename else None
     })
 
 @app.route('/uploads/<path:filename>', methods=['GET'])
@@ -466,15 +489,15 @@ def create_material():
     attachment_filename = None
     attachment_original_name = None
 
-    if 'file' in request.files and request.files['file'].filename:
-        file = request.files['file']
-        original_name = file.filename
-        safe_name = secure_filename(f"mat_{user.id}_{int(datetime.now().timestamp())}_{original_name}")
-        upload_dir = os.path.join(app.root_path, 'uploads', 'materials')
-        os.makedirs(upload_dir, exist_ok=True)
-        file.save(os.path.join(upload_dir, safe_name))
-        attachment_filename = f"materials/{safe_name}"
-        attachment_original_name = original_name
+    # --- Multi-file upload: field name 'files' (multiple) ---
+    uploaded_files = request.files.getlist('files')
+    # Fallback ke field 'file' tunggal jika tidak ada 'files'
+    if not uploaded_files or all(f.filename == '' for f in uploaded_files):
+        single = request.files.get('file')
+        uploaded_files = [single] if single and single.filename else []
+
+    upload_dir = os.path.join(app.root_path, 'uploads', 'materials')
+    os.makedirs(upload_dir, exist_ok=True)
 
     m = Material(
         title=title, content=content, summary=summary,
@@ -482,6 +505,24 @@ def create_material():
         attachment_filename=attachment_filename, attachment_original_name=attachment_original_name
     )
     db.session.add(m)
+    db.session.flush()  # dapatkan m.id sebelum commit
+
+    for file in uploaded_files:
+        if not file or not file.filename:
+            continue
+        original_name = file.filename
+        safe_name = secure_filename(f"mat_{user.id}_{m.id}_{int(datetime.now().timestamp())}_{original_name}")
+        file_path = os.path.join(upload_dir, safe_name)
+        file.save(file_path)
+        file_size = os.path.getsize(file_path)
+        att = MaterialAttachment(
+            material_id=m.id,
+            filename=f"materials/{safe_name}",
+            original_name=original_name,
+            file_size=file_size
+        )
+        db.session.add(att)
+
     db.session.commit()
     return jsonify({'success': True, 'message': 'Materi berhasil dibuat.'}), 201
 
@@ -500,6 +541,26 @@ def toggle_material(id):
         progress.completed_at = datetime.now() if progress.is_completed else None
     db.session.commit()
     return jsonify({'success': True, 'is_completed': progress.is_completed})
+
+
+@app.route('/api/materials/<int:mat_id>/attachments/<int:att_id>', methods=['DELETE', 'OPTIONS'])
+@login_required
+def delete_material_attachment(mat_id, att_id):
+    """Guru menghapus satu file lampiran dari materi."""
+    user = get_current_user()
+    if user.role != 'guru':
+        return jsonify({'error': 'Forbidden'}), 403
+
+    att = MaterialAttachment.query.filter_by(id=att_id, material_id=mat_id).first_or_404()
+
+    # Hapus file dari disk
+    file_path = os.path.join(app.root_path, 'uploads', att.filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    db.session.delete(att)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Lampiran berhasil dihapus.'})
 
 
 @app.route('/api/assignments', methods=['GET'])
@@ -622,6 +683,93 @@ def submit_assignment(assignment_id):
     db.session.add(sub)
     db.session.commit()
     return jsonify({'success': True, 'message': 'Tugas berhasil dikirim.'}), 201
+
+
+@app.route('/api/assignments/<int:assignment_id>/submissions', methods=['GET'])
+@login_required
+def get_assignment_submissions(assignment_id):
+    """Guru melihat semua pengumpulan tugas dari murid."""
+    user = get_current_user()
+    if user.role != 'guru':
+        return jsonify({'error': 'Forbidden'}), 403
+
+    assignment = Assignment.query.get_or_404(assignment_id)
+
+    # Semua murid yang sudah mengumpulkan
+    submissions = Submission.query.filter_by(assignment_id=assignment_id).all()
+    submitted_ids = {s.student_id for s in submissions}
+
+    # Semua murid yang seharusnya bisa melihat tugas ini
+    if assignment.target_student_id:
+        all_students = User.query.filter_by(id=assignment.target_student_id, role='murid').all()
+    else:
+        all_students = User.query.filter_by(role='murid', is_approved=True).all()
+
+    base_url = os.environ.get('VITE_API_URL', '')
+
+    sub_data = []
+    for sub in submissions:
+        sub_data.append({
+            'submission_id': sub.id,
+            'student_id': sub.student_id,
+            'student_name': sub.student.display_name if sub.student else f'Murid #{sub.student_id}',
+            'file_url': f"{base_url}/uploads/submissions/{sub.file_filename}",
+            'file_name': sub.file_original_name,
+            'note': sub.note,
+            'submitted_at': sub.submitted_at.isoformat(),
+            'is_late': sub.is_late,
+            'grade': sub.grade,
+            'feedback': sub.feedback,
+            'is_graded': sub.is_graded,
+        })
+
+    # Murid yang belum mengumpulkan
+    not_submitted = []
+    for st in all_students:
+        if st.id not in submitted_ids:
+            not_submitted.append({
+                'student_id': st.id,
+                'student_name': st.display_name,
+            })
+
+    return jsonify({
+        'assignment_id': assignment_id,
+        'title': assignment.title,
+        'submissions': sub_data,
+        'not_submitted': not_submitted,
+    })
+
+
+@app.route('/api/submissions/<int:submission_id>/grade', methods=['POST', 'OPTIONS'])
+@login_required
+def grade_submission(submission_id):
+    """Guru memberi nilai dan feedback pada satu submission."""
+    user = get_current_user()
+    if user.role != 'guru':
+        return jsonify({'error': 'Forbidden'}), 403
+
+    sub = Submission.query.get_or_404(submission_id)
+    data = request.json or {}
+
+    grade = data.get('grade')
+    feedback = data.get('feedback', '').strip()
+
+    if grade is None:
+        return jsonify({'error': 'Bad Request', 'message': 'Nilai wajib diisi.'}), 400
+
+    try:
+        grade = int(grade)
+        if not (0 <= grade <= 100):
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Bad Request', 'message': 'Nilai harus angka antara 0 - 100.'}), 400
+
+    sub.grade = grade
+    sub.feedback = feedback
+    sub.graded_at = datetime.now()
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': f'Nilai {grade} berhasil disimpan.', 'grade': grade})
 
 @app.route('/api/users/teachers', methods=['GET'])
 @login_required

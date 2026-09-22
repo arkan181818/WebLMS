@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { BookOpen, Plus, ChevronRight, CheckCircle, Circle, X, Save, FileText, Download, Paperclip } from 'lucide-react';
+import { BookOpen, Plus, ChevronRight, CheckCircle, Circle, X, Save, FileText, Download, Paperclip, Trash2, FileImage, FileArchive, File } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 export default function Materials({ user, onLogout }) {
@@ -18,7 +18,7 @@ export default function Materials({ user, onLogout }) {
   const [formSummary, setFormSummary] = useState('');
   const [formContent, setFormContent] = useState('');
   const [formVideoUrl, setFormVideoUrl] = useState('');
-  const [formFile, setFormFile] = useState(null);
+  const [formFiles, setFormFiles] = useState([]); // Array of File objects
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -72,7 +72,8 @@ export default function Materials({ user, onLogout }) {
       formData.append('summary', formSummary);
       formData.append('content', formContent);
       if (formVideoUrl) formData.append('video_url', formVideoUrl);
-      if (formFile) formData.append('file', formFile);
+      // Kirim semua file dengan field name 'files'
+      formFiles.forEach(f => formData.append('files', f));
 
       await api.post('/api/materials/create', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -80,7 +81,7 @@ export default function Materials({ user, onLogout }) {
 
       toast.success('Materi baru berhasil dipublikasikan!');
       setShowForm(false);
-      setFormTitle(''); setFormSubjectName(''); setFormSummary(''); setFormContent(''); setFormVideoUrl(''); setFormFile(null);
+      setFormTitle(''); setFormSubjectName(''); setFormSummary(''); setFormContent(''); setFormVideoUrl(''); setFormFiles([]);
       fetchMaterials();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal membuat materi');
@@ -89,11 +90,33 @@ export default function Materials({ user, onLogout }) {
     }
   };
 
-  const getAttachmentUrl = (filename) => {
-    if (!filename) return '#';
-    if (filename.startsWith('http')) return filename;
+  const getAttachmentUrl = (url) => {
+    if (!url) return '#';
+    if (url.startsWith('http')) return url;
     const baseUrl = import.meta.env.VITE_API_URL || '';
-    return `${baseUrl}/uploads/${filename}`;
+    return url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/uploads/${url}`;
+  };
+
+  const getFileIcon = (filename) => {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    if (['pdf'].includes(ext)) return <FileText size={20} className="text-rose-400" />;
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return <FileImage size={20} className="text-emerald-400" />;
+    if (['zip', 'rar', '7z'].includes(ext)) return <FileArchive size={20} className="text-amber-400" />;
+    if (['doc', 'docx'].includes(ext)) return <FileText size={20} className="text-blue-400" />;
+    if (['ppt', 'pptx'].includes(ext)) return <FileText size={20} className="text-orange-400" />;
+    if (['xls', 'xlsx'].includes(ext)) return <FileText size={20} className="text-green-400" />;
+    return <File size={20} className="text-slate-400" />;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const removeFormFile = (idx) => {
+    setFormFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
   if (loading || !user) {
@@ -262,17 +285,50 @@ export default function Materials({ user, onLogout }) {
                     />
                   </div>
 
-                  {/* Upload File PDF/Dokumen */}
-                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                    <label className="block text-sm font-semibold text-slate-200 mb-1 flex items-center gap-2">
-                      <Paperclip size={16} className="text-primary-light" /> Lampiran File (PDF / Dokumen / Gambar)
+                  {/* Upload File PDF/Dokumen - Multiple */}
+                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-3">
+                    <label className="block text-sm font-semibold text-slate-200 flex items-center gap-2">
+                      <Paperclip size={16} className="text-primary-light" /> Lampiran File (bisa lebih dari 1)
                     </label>
-                    <p className="text-xs text-slate-400 mb-3">Upload modul materi berformat PDF, Word, PPT, ZIP, atau Gambar.</p>
+                    <p className="text-xs text-slate-400">Upload PDF, Word, PPT, ZIP, Gambar, dll. Klik atau seret beberapa file sekaligus.</p>
                     <input
+                      id="mat-file-input"
                       type="file"
-                      onChange={e => setFormFile(e.target.files[0])}
-                      className="text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/20 file:text-primary-light hover:file:bg-primary/30 transition-all cursor-pointer"
+                      multiple
+                      onChange={e => {
+                        const picked = Array.from(e.target.files);
+                        setFormFiles(prev => {
+                          const existing = new Set(prev.map(f => f.name + f.size));
+                          const fresh = picked.filter(f => !existing.has(f.name + f.size));
+                          return [...prev, ...fresh];
+                        });
+                        e.target.value = '';
+                      }}
+                      className="text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/20 file:text-primary-light hover:file:bg-primary/30 transition-all cursor-pointer w-full"
                     />
+
+                    {/* Daftar file yang dipilih */}
+                    {formFiles.length > 0 && (
+                      <ul className="space-y-2 mt-2">
+                        {formFiles.map((f, idx) => (
+                          <li key={idx} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.08]">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {getFileIcon(f.name)}
+                              <span className="text-sm text-slate-200 truncate">{f.name}</span>
+                              <span className="text-xs text-slate-500 flex-shrink-0">{formatFileSize(f.size)}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFormFile(idx)}
+                              className="text-slate-500 hover:text-rose-400 transition-colors flex-shrink-0"
+                              title="Hapus file ini"
+                            >
+                              <X size={16} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <div>
@@ -332,26 +388,41 @@ export default function Materials({ user, onLogout }) {
                       </button>
                     </div>
 
-                    {/* Attachment PDF Download */}
-                    {selectedMaterial.attachment_url && (
-                      <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-primary/10 to-violet/10 border border-primary/30 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary-light">
-                            <FileText size={20} />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-white">File Lampiran Modul</h4>
-                            <p className="text-xs text-slate-400">{selectedMaterial.attachment || 'Dokumen Materi'}</p>
-                          </div>
+                    {/* Attachments — Multi-file */}
+                    {selectedMaterial.attachments && selectedMaterial.attachments.length > 0 && (
+                      <div className="mb-6">
+                        <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                          <Paperclip size={15} className="text-primary-light" />
+                          Lampiran File ({selectedMaterial.attachments.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {selectedMaterial.attachments.map((att, idx) => (
+                            <div
+                              key={att.id ?? idx}
+                              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-primary/5 to-violet/5 border border-primary/20 group hover:border-primary/40 transition-all"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                                  {getFileIcon(att.name)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-white truncate">{att.name}</p>
+                                  {att.size && (
+                                    <p className="text-xs text-slate-500">{formatFileSize(att.size)}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <a
+                                href={getAttachmentUrl(att.url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs font-semibold text-primary-light border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition-all flex-shrink-0"
+                              >
+                                <Download size={13} /> Unduh
+                              </a>
+                            </div>
+                          ))}
                         </div>
-                        <a
-                          href={getAttachmentUrl(selectedMaterial.attachment_url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-primary py-2 px-4 text-xs flex items-center gap-2 shadow-lg shadow-primary/20"
-                        >
-                          <Download size={14} /> Unduh / Buka PDF
-                        </a>
                       </div>
                     )}
 
