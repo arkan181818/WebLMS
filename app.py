@@ -505,25 +505,34 @@ def create_material():
         attachment_filename=attachment_filename, attachment_original_name=attachment_original_name
     )
     db.session.add(m)
-    db.session.flush()  # dapatkan m.id sebelum commit
+    db.session.commit()  # commit dulu agar m.id tersedia
 
+    # Simpan file-file lampiran (jika ada)
     for file in uploaded_files:
         if not file or not file.filename:
             continue
-        original_name = file.filename
-        safe_name = secure_filename(f"mat_{user.id}_{m.id}_{int(datetime.now().timestamp())}_{original_name}")
-        file_path = os.path.join(upload_dir, safe_name)
-        file.save(file_path)
-        file_size = os.path.getsize(file_path)
-        att = MaterialAttachment(
-            material_id=m.id,
-            filename=f"materials/{safe_name}",
-            original_name=original_name,
-            file_size=file_size
-        )
-        db.session.add(att)
+        try:
+            original_name = file.filename
+            safe_name = secure_filename(f"mat_{user.id}_{m.id}_{int(datetime.now().timestamp())}_{original_name}")
+            file_path = os.path.join(upload_dir, safe_name)
+            file.save(file_path)
+            file_size = os.path.getsize(file_path)
+            att = MaterialAttachment(
+                material_id=m.id,
+                filename=f"materials/{safe_name}",
+                original_name=original_name,
+                file_size=file_size
+            )
+            db.session.add(att)
+        except Exception:
+            pass  # file gagal disimpan tidak membatalkan pembuatan materi
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        # Materi sudah tersimpan, hanya lampiran yang gagal — tetap sukses
+
     return jsonify({'success': True, 'message': 'Materi berhasil dibuat.'}), 201
 
 @app.route('/api/materials/<int:id>/toggle', methods=['POST'])
