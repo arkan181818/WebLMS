@@ -11,7 +11,7 @@ export default function Chat({ user, onLogout }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   useEffect(() => {
     fetchContacts();
@@ -26,7 +26,9 @@ export default function Chat({ user, onLogout }) {
   }, [selectedContact]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   const fetchContacts = async () => {
@@ -73,15 +75,15 @@ export default function Chat({ user, onLogout }) {
   }
 
   return (
-    <div className="page-bg flex">
+    <div className="h-screen w-full overflow-hidden flex bg-[#0F172A] page-bg">
       <Sidebar user={user} onLogout={onLogout} />
 
-      <div className="flex-1 ml-64 flex flex-col h-screen relative z-10">
-        <div className="flex flex-1 overflow-hidden">
+      <div className="flex-1 ml-64 flex flex-col h-screen overflow-hidden relative z-10">
+        <div className="flex flex-1 h-full overflow-hidden">
           
           {/* Contact List / Daftar Mentor */}
-          <div className="w-80 bg-[#0B1120]/80 backdrop-blur-xl border-r border-white/[0.06] flex flex-col">
-            <div className="p-5 border-b border-white/[0.06]">
+          <div className="w-80 bg-[#0B1120]/80 backdrop-blur-xl border-r border-white/[0.06] flex flex-col h-full overflow-hidden shrink-0">
+            <div className="p-5 border-b border-white/[0.06] shrink-0">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Sparkles size={18} className="text-primary-light" />
                 {user.role === 'guru' ? 'Daftar Murid Aktif' : 'Konsultasi Mentor'}
@@ -144,7 +146,7 @@ export default function Chat({ user, onLogout }) {
           </div>
 
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
             {!selectedContact ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                 <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-5 border border-white/10 shadow-xl">
@@ -188,6 +190,7 @@ export default function Chat({ user, onLogout }) {
 
                 {/* Messages Container */}
                 <div
+                  ref={messagesContainerRef}
                   className="flex-1 overflow-y-auto px-6 py-4 space-y-3"
                   style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.9) 0%, rgba(30,27,75,0.3) 100%)' }}
                 >
@@ -217,7 +220,6 @@ export default function Chat({ user, onLogout }) {
                       </div>
                     </motion.div>
                   ))}
-                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* Send Input */}
