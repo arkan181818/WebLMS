@@ -29,23 +29,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     **({'connect_args': {'connect_timeout': 10}} if _is_postgres else {}),
 }
 
-CORS(app, resources={r"/api/*": {"origins": "*"}})
-
-@app.before_request
-def handle_preflight():
-    if request.method == 'OPTIONS':
-        response = app.make_default_options_response()
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
-        return response
-
-@app.after_request
-def add_cors_headers(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
-    return response
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
