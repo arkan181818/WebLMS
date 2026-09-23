@@ -59,10 +59,26 @@ export default function Materials({ user, onLogout }) {
     }
   };
 
+  const MAX_FILE_SIZE_MB = 20;
+  const MAX_TOTAL_SIZE_MB = 40;
+
   const handleCreateMaterial = async (e) => {
     e.preventDefault();
     if (!formSubjectName.trim()) { toast.error('Mata pelajaran wajib diisi'); return; }
     if (!formTitle.trim() || !formContent.trim()) { toast.error('Judul dan isi materi wajib diisi'); return; }
+
+    // Validasi ukuran file sebelum upload
+    for (const f of formFiles) {
+      if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(`File "${f.name}" terlalu besar! Maksimal ${MAX_FILE_SIZE_MB}MB per file.`);
+        return;
+      }
+    }
+    const totalSize = formFiles.reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      toast.error(`Total ukuran file terlalu besar! Maksimal ${MAX_TOTAL_SIZE_MB}MB.`);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -84,11 +100,16 @@ export default function Materials({ user, onLogout }) {
       setFormTitle(''); setFormSubjectName(''); setFormSummary(''); setFormContent(''); setFormVideoUrl(''); setFormFiles([]);
       fetchMaterials();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal membuat materi');
+      if (err.response?.status === 413) {
+        toast.error('File terlalu besar! Ukuran total melebihi batas server. Coba kurangi ukuran atau jumlah file.');
+      } else {
+        toast.error(err.response?.data?.message || 'Gagal membuat materi. Periksa koneksi ke server.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   const getAttachmentUrl = (url) => {
     if (!url) return '#';
@@ -290,7 +311,7 @@ export default function Materials({ user, onLogout }) {
                     <label className="block text-sm font-semibold text-slate-200 flex items-center gap-2">
                       <Paperclip size={16} className="text-primary-light" /> Lampiran File (bisa lebih dari 1)
                     </label>
-                    <p className="text-xs text-slate-400">Upload PDF, Word, PPT, ZIP, Gambar, dll. Klik atau seret beberapa file sekaligus.</p>
+                    <p className="text-xs text-slate-400">Upload PDF, Word, PPT, ZIP, Gambar, dll. Maks. <span className="text-amber-400 font-semibold">{MAX_FILE_SIZE_MB}MB per file</span> / total {MAX_TOTAL_SIZE_MB}MB.</p>
                     <input
                       id="mat-file-input"
                       type="file"
