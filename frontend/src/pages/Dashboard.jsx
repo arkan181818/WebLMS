@@ -7,9 +7,12 @@ import Sidebar from '../components/Sidebar';
 export default function Dashboard({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     fetchDashboard();
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const fetchDashboard = async () => {
@@ -67,9 +70,25 @@ export default function Dashboard({ user, onLogout }) {
 
       <div className="flex-1 md:ml-64 ml-0 p-5 pt-20 md:p-8 relative z-10">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Halo, {user?.display_name || user?.username || 'Pengguna'}! 👋</h1>
-          <p className="text-slate-400 mt-2">Selamat datang kembali di RuangBelajar. Mari lanjutkan progresmu hari ini.</p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Halo, {user?.display_name || user?.username || 'Pengguna'}! 👋</h1>
+            <p className="text-slate-400 mt-2">Selamat datang kembali di RuangBelajar. Mari lanjutkan progresmu hari ini.</p>
+          </div>
+          
+          <div className="bg-[#0B1120]/60 border border-white/[0.08] backdrop-blur-md rounded-2xl p-3.5 px-5 flex items-center gap-4 shadow-lg shadow-black/20 self-start lg:self-auto">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary-light">
+              <Clock size={20} />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white tracking-wide leading-none mb-1">
+                {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
+                {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Stats */}
