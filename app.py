@@ -31,11 +31,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-@app.before_request
-def handle_preflight():
-    if request.method == 'OPTIONS':
-        # Biarkan flask-cors yang menambahkan header CORS pada response ini
-        return '', 200
+
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -127,7 +123,7 @@ def get_me():
         })
     return jsonify({'authenticated': False})
 
-@app.route('/api/login', methods=['POST', 'OPTIONS'])
+@app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
     identifier = data.get('identifier', '').strip()
@@ -162,7 +158,7 @@ def login():
         })
     return jsonify({'success': False, 'message': 'Email/Username atau password salah.'}), 401
 
-@app.route('/api/profile/update', methods=['POST', 'OPTIONS'])
+@app.route('/api/profile/update', methods=['POST'])
 @login_required
 def update_profile():
     user = get_current_user()
@@ -205,7 +201,7 @@ def update_profile():
         }
     })
 
-@app.route('/api/register', methods=['POST', 'OPTIONS'])
+@app.route('/api/register', methods=['POST'])
 def register():
     try:
         data = request.json or {}
@@ -258,7 +254,7 @@ def register():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Gagal mendaftar: {str(e)}'}), 500
 
-@app.route('/api/logout', methods=['POST', 'OPTIONS'])
+@app.route('/api/logout', methods=['POST'])
 def logout():
     # With JWT, logout is handled client-side by removing the token
     return jsonify({'success': True, 'message': 'Anda telah berhasil keluar.'})
@@ -294,7 +290,7 @@ def get_pending_users():
         'created_at': u.created_at.isoformat()
     } for u in pending_users])
 
-@app.route('/api/users/<int:student_id>/approve', methods=['POST', 'OPTIONS'])
+@app.route('/api/users/<int:student_id>/approve', methods=['POST'])
 @login_required
 def approve_user(student_id):
     user = get_current_user()
@@ -309,7 +305,7 @@ def approve_user(student_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Akun berhasil disetujui.'})
 
-@app.route('/api/users/<int:student_id>/reject', methods=['POST', 'OPTIONS'])
+@app.route('/api/users/<int:student_id>/reject', methods=['POST'])
 @login_required
 def reject_user(student_id):
     user = get_current_user()
@@ -554,7 +550,7 @@ def toggle_material(id):
     return jsonify({'success': True, 'is_completed': progress.is_completed})
 
 
-@app.route('/api/materials/<int:mat_id>/attachments/<int:att_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/materials/<int:mat_id>/attachments/<int:att_id>', methods=['DELETE'])
 @login_required
 def delete_material_attachment(mat_id, att_id):
     """Guru menghapus satu file lampiran dari materi."""
@@ -751,7 +747,7 @@ def get_assignment_submissions(assignment_id):
     })
 
 
-@app.route('/api/submissions/<int:submission_id>/grade', methods=['POST', 'OPTIONS'])
+@app.route('/api/submissions/<int:submission_id>/grade', methods=['POST'])
 @login_required
 def grade_submission(submission_id):
     """Guru memberi nilai dan feedback pada satu submission."""
@@ -797,7 +793,7 @@ def get_teachers():
         'role': 'guru'
     } for t in teachers])
 
-@app.route('/api/users/create_teacher', methods=['POST', 'OPTIONS'])
+@app.route('/api/users/create_teacher', methods=['POST'])
 @login_required
 def create_teacher():
     user = get_current_user()
@@ -858,7 +854,7 @@ def create_teacher():
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Gagal menambahkan mentor: {str(e)}'}), 500
 
-@app.route('/api/users/mentor-access', methods=['POST', 'OPTIONS'])
+@app.route('/api/users/mentor-access', methods=['POST'])
 @teacher_required
 def mentor_access():
     data = request.json or {}
@@ -914,7 +910,7 @@ def get_unread_chat_count():
     count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
     return jsonify({'count': count})
 
-@app.route('/api/chat/<int:target_id>', methods=['POST', 'OPTIONS'])
+@app.route('/api/chat/<int:target_id>', methods=['POST'])
 @login_required
 def send_message(target_id):
     user = get_current_user()
