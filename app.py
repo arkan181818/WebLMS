@@ -29,7 +29,12 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     **({'connect_args': {'connect_timeout': 10}} if _is_postgres else {}),
 }
 
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    "expose_headers": ["Content-Type", "Authorization"]
+}})
 
 
 
