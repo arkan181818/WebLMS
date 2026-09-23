@@ -6,10 +6,22 @@ from models import db, User, Subject, Material, MaterialAttachment, MaterialProg
 def init_db(app):
     db.init_app(app)
     with app.app_context():
-        db.create_all()
-        _optimize_database_performance()
-        _add_missing_user_columns()
-        seed_data()
+        # Retry hingga 3x karena Neon DB bisa auto-suspend dan butuh waktu "bangun"
+        import time
+        for attempt in range(3):
+            try:
+                db.create_all()
+                _optimize_database_performance()
+                _add_missing_user_columns()
+                seed_data()
+                print("Database initialized successfully.")
+                break
+            except Exception as e:
+                print(f"DB init attempt {attempt+1} failed: {e}")
+                if attempt < 2:
+                    time.sleep(3)  # tunggu 3 detik lalu coba lagi
+                else:
+                    print("WARNING: DB init failed after 3 attempts. Server will still start.")
 
 def _optimize_database_performance():
     try:
@@ -29,7 +41,9 @@ def _add_missing_user_columns():
         if inspector.has_table('users'):
             columns = {column['name'] for column in inspector.get_columns('users')}
             if 'is_approved' not in columns:
-                db.session.execute(text('ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT 1'))
+                # DEFAULT FALSE agar semua akun baru butuh persetujuan (kompatibel PostgreSQL & SQLite)
+                default_val = 'FALSE' if 'postgresql' in str(db.engine.url) else '0'
+                db.session.execute(text(f'ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT {default_val}'))
             if 'department' not in columns:
                 db.session.execute(text('ALTER TABLE users ADD COLUMN department VARCHAR(120)'))
             if 'campus' not in columns:

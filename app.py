@@ -20,6 +20,14 @@ if db_uri.startswith("postgres://"):
     db_uri = db_uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Agar koneksi ke Neon (serverless PostgreSQL) tidak mati saat auto-suspend
+# connect_args hanya untuk PostgreSQL (psycopg2), tidak perlu connect_timeout di sini
+_is_postgres = not db_uri.startswith('sqlite')
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,      # cek koneksi sebelum dipakai
+    'pool_recycle': 300,        # recycle koneksi setiap 5 menit
+    **({'connect_args': {'connect_timeout': 10}} if _is_postgres else {}),
+}
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
@@ -477,11 +485,11 @@ def create_material():
     else:
         data = request.form
 
-    title = data.get('title', '').strip()
-    content = data.get('content', '').strip()
-    summary = data.get('summary', '').strip()
-    subject_input = data.get('subject_name') or data.get('subject_id')
-    video_url = data.get('video_url', '').strip() or None
+    title = (data.get('title') or '').strip()
+    content = (data.get('content') or '').strip()
+    summary = (data.get('summary') or '').strip()
+    subject_input = (data.get('subject_name') or data.get('subject_id') or '').strip() or None
+    video_url = (data.get('video_url') or '').strip() or None
 
     if not title or not content or not subject_input:
         return jsonify({'error': 'Bad Request', 'message': 'Judul, konten, dan mata pelajaran wajib diisi.'}), 400
