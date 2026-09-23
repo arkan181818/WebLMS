@@ -31,6 +31,12 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+@app.before_request
+def handle_preflight():
+    if request.method == 'OPTIONS':
+        # Biarkan flask-cors yang menambahkan header CORS pada response ini
+        return '', 200
+
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
