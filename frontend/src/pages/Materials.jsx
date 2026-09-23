@@ -437,9 +437,10 @@ export default function Materials({ user, onLogout }) {
                                 href={getAttachmentUrl(att.url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onContextMenu={(e) => e.preventDefault()} // Mencegah klik kanan untuk save link
                                 className="flex items-center gap-1.5 text-xs font-semibold text-primary-light border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/20 transition-all flex-shrink-0"
                               >
-                                <Download size={13} /> Unduh
+                                Buka Materi
                               </a>
                             </div>
                           ))}
