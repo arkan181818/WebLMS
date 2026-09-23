@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import api from '../lib/api';
 import toast from 'react-hot-toast';
-import { MessageCircle, Send, User as UserIcon, Sparkles } from 'lucide-react';
+import { MessageCircle, Send, User as UserIcon, Sparkles, ArrowLeft } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 export default function Chat({ user, onLogout }) {
@@ -78,11 +78,11 @@ export default function Chat({ user, onLogout }) {
     <div className="h-screen w-full overflow-hidden flex bg-[#0F172A] page-bg">
       <Sidebar user={user} onLogout={onLogout} />
 
-      <div className="flex-1 ml-64 flex flex-col h-screen overflow-hidden relative z-10">
+      <div className="flex-1 md:ml-64 ml-0 flex flex-col h-screen overflow-hidden relative z-10 pt-16 md:pt-0">
         <div className="flex flex-1 h-full overflow-hidden">
           
           {/* Contact List / Daftar Mentor */}
-          <div className="w-80 bg-[#0B1120]/80 backdrop-blur-xl border-r border-white/[0.06] flex flex-col h-full overflow-hidden shrink-0">
+          <div className={`${selectedContact ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-[#0B1120]/80 backdrop-blur-xl border-r border-white/[0.06] flex-col h-full overflow-hidden shrink-0`}>
             <div className="p-5 border-b border-white/[0.06] shrink-0">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Sparkles size={18} className="text-primary-light" />
@@ -146,7 +146,7 @@ export default function Chat({ user, onLogout }) {
           </div>
 
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
+          <div className={`${!selectedContact ? 'hidden md:flex' : 'flex'} flex-1 flex-col h-full overflow-hidden`}>
             {!selectedContact ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                 <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-5 border border-white/10 shadow-xl">
@@ -164,9 +164,16 @@ export default function Chat({ user, onLogout }) {
             ) : (
               <>
                 {/* Chat Header */}
-                <div className="bg-[#0B1120]/80 backdrop-blur-xl px-6 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
+                <div className="bg-[#0B1120]/80 backdrop-blur-xl px-4 md:px-6 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-gradient-to-br from-primary to-violet rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20">
+                    {/* Mobile Back Button */}
+                    <button 
+                      onClick={() => setSelectedContact(null)}
+                      className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                    <div className="w-11 h-11 bg-gradient-to-br from-primary to-violet rounded-full flex items-center justify-center text-white font-bold text-sm uppercase shadow-lg shadow-primary/20 shrink-0">
                       {(selectedContact.full_name || selectedContact.username || 'M').charAt(0)}
                     </div>
                     <div>

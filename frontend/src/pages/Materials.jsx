@@ -157,7 +157,7 @@ export default function Materials({ user, onLogout }) {
       <div className="orb orb-2" />
       <Sidebar user={user} onLogout={onLogout} />
 
-      <div className="flex-1 ml-64 p-8 relative z-10">
+      <div className="flex-1 md:ml-64 ml-0 p-5 pt-20 md:p-8 relative z-10">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-center justify-between">
           <div>

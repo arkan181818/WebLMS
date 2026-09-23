@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { LogOut, Home, BookOpen, PenTool, MessageCircle, Users, Sparkles } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { LogOut, Home, BookOpen, PenTool, MessageCircle, Users, Sparkles, Menu, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 export default function Sidebar({ user, onLogout }) {
   const location = useLocation();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
   const isGuru = user?.role === 'guru';
 
   useEffect(() => {
@@ -26,6 +27,11 @@ export default function Sidebar({ user, onLogout }) {
     const interval = setInterval(fetchUnreadChatCount, 5000);
     return () => clearInterval(interval);
   }, [isGuru]);
+
+  useEffect(() => {
+    // Close sidebar on route change in mobile
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -54,9 +60,33 @@ export default function Sidebar({ user, onLogout }) {
   ];
 
   return (
-    <div className="w-64 h-screen flex flex-col fixed left-0 top-0 z-40 bg-[#0B1120]/90 backdrop-blur-2xl border-r border-white/[0.06]">
-      {/* Logo */}
-      <div className="p-6 border-b border-white/[0.06] flex items-center gap-3">
+    <>
+      {/* Mobile Toggle Button */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2.5 bg-[#0B1120]/80 backdrop-blur-md border border-white/10 rounded-xl text-white shadow-lg"
+      >
+        {isOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsOpen(false)}
+            className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar Container */}
+      <div className={`w-64 h-screen flex flex-col fixed left-0 top-0 z-40 bg-[#0B1120]/95 backdrop-blur-2xl border-r border-white/[0.06] transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        {/* Logo */}
+        <div className="p-6 border-b border-white/[0.06] flex items-center gap-3">
+
         <div className="w-10 h-10 bg-gradient-to-br from-primary to-violet rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
           <Sparkles size={22} />
         </div>
@@ -116,6 +146,7 @@ export default function Sidebar({ user, onLogout }) {
           </div>
         );
       })()}
-    </div>
+      </div>
+    </>
   );
 }
