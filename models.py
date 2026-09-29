@@ -1,4 +1,5 @@
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -235,3 +236,161 @@ class Message(db.Model):
 
     def __repr__(self):
         return f'<Message From:{self.sender_id} To:{self.receiver_id}>'
+
+
+class Quiz(db.Model):
+    __tablename__ = 'quizzes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    subject_id = db.Column(db.Integer, db.ForeignKey('subjects.id'), nullable=False)
+    teacher_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    target_student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    start_time = db.Column(db.DateTime, nullable=True)
+    end_time = db.Column(db.DateTime, nullable=True)
+    duration_minutes = db.Column(db.Integer, default=60, nullable=False)
+    show_score_immediately = db.Column(db.Boolean, default=True)
+    is_published = db.Column(db.Boolean, default=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Relasi
+    subject = db.relationship('Subject', backref=db.backref('quizzes', lazy=True, cascade='all, delete-orphan'))
+    teacher = db.relationship('User', foreign_keys=[teacher_id], backref=db.backref('quizzes_created', lazy=True, cascade='all, delete-orphan'))
+    target_student = db.relationship('User', foreign_keys=[target_student_id], backref=db.backref('quizzes_received', lazy=True, cascade='all, delete-orphan'))
+    questions = db.relationship('QuizQuestion', backref='quiz', lazy=True, cascade='all, delete-orphan', order_by='QuizQuestion.order_index')
+    attempts = db.relationship('QuizAttempt', backref='quiz', lazy=True, cascade='all, delete-orphan')
+
+    @property
+    def total_points(self):
+        return sum(q.points for q in self.questions)
+
+    @property
+    def question_count(self):
+        return len(self.questions)
+
+    @property
+    def has_essay(self):
+        return any(q.question_type == 'essay' for q in self.questions)
+
+    @property
+    def is_active(self):
+        now = datetime.now()
+        if self.start_time and now < self.start_time:
+            return False
+        if self.end_time and now > self.end_time:
+            return False
+        return self.is_published
+
+    def get_student_attempt(self, student_id):
+        if not student_id:
+            return None
+        return QuizAttempt.query.filter_by(quiz_id=self.id, student_id=student_id).first()
+
+    def __repr__(self):
+        return f'<Quiz {self.title}>'
+
+
+class QuizQuestion(db.Model):
+    __tablename__ = 'quiz_questions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quizzes.id'), nullable=False)
+    question_type = db.Column(db.String(20), nullable=False, default='multiple_choice')  # 'multiple_choice' or 'essay'
+    question_text = db.Column(db.Text, nullable=False)
+    options_json = db.Column(db.Text, nullable=True)  # JSON list: [{"key": "A", "text": "Option 1"}, ...]
+    correct_answer = db.Column(db.String(10), nullable=True)  # 'A', 'B', 'C', etc.
+    rubric = db.Column(db.Text, nullable=True)  # Panduan rubrik guru
+    points = db.Column(db.Float, default=10.0, nullable=False)
+    order_index = db.Column(db.Integer, default=0, nullable=False)
+
+    answers = db.relationship('QuizAnswer', backref='question', lazy=True, cascade='all, delete-orphan')
+
+    def get_options(self):
+        if not self.options_json:
+            return []
+        try:
+            return json.loads(self.options_json)
+        except:
+            return []
+
+    def set_options(self, options_list):
+        self.options_json = json.dumps(options_list)
+
+    def __repr__(self):
+        return f'<QuizQuestion {self.id} Type:{self.question_type}>'
+
+
+class QuizAttempt(db.Model):
+    __tablename__ = 'quiz_attempts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quizzes.id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    started_at = db.Column(db.DateTime, default=datetime.now)
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    total_score = db.Column(db.Float, nullable=True)  # Skala 0 - 100
+    status = db.Column(db.String(20), default='in_progress', nullable=False)  # 'in_progress', 'submitted', 'graded'
+    is_score_released = db.Column(db.Boolean, default=False)
+
+    student = db.relationship('User', backref=db.backref('quiz_attempts', lazy=True, cascade='all, delete-orphan'))
+    answers = db.relationship('QuizAnswer', backref='attempt', lazy=True, cascade='all, delete-orphan')
+
+    __table_args__ = (
+        db.UniqueConstraint('quiz_id', 'student_id', name='uq_quiz_student_attempt'),
+    )
+
+    def calculate_score(self):
+        """Kalkulasi skor otomatis untuk soal PG dan gabungkan dengan nilai essai jika sudah dinilai."""
+        total_quiz_points = self.quiz.total_points
+        if total_quiz_points <= 0:
+            self.total_score = 0
+            return 0
+        
+        earned_total = 0
+        for ans in self.answers:
+            if ans.earned_points is not None:
+                earned_total += ans.earned_points
+        
+        final_percentage = round((earned_total / total_quiz_points) * 100, 2)
+        final_percentage = min(100.0, max(0.0, final_percentage))
+        self.total_score = final_percentage
+        return final_percentage
+
+    @property
+    def remaining_seconds(self):
+        if self.submitted_at or self.status != 'in_progress':
+            return 0
+        if not self.quiz.duration_minutes:
+            return None
+        deadline = self.started_at + timedelta(minutes=self.quiz.duration_minutes)
+        now = datetime.now()
+        diff = (deadline - now).total_seconds()
+        return max(0, int(diff))
+
+    def __repr__(self):
+        return f'<QuizAttempt Student:{self.student_id} Quiz:{self.quiz_id} Score:{self.total_score}>'
+
+
+class QuizAnswer(db.Model):
+    __tablename__ = 'quiz_answers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempts.id'), nullable=False)
+    question_id = db.Column(db.Integer, db.ForeignKey('quiz_questions.id'), nullable=False)
+    selected_option = db.Column(db.String(10), nullable=True)
+    essay_answer = db.Column(db.Text, nullable=True)
+    earned_points = db.Column(db.Float, nullable=True)
+    teacher_feedback = db.Column(db.Text, nullable=True)
+    is_graded = db.Column(db.Boolean, default=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('attempt_id', 'question_id', name='uq_attempt_question_answer'),
+    )
+
+    def __repr__(self):
+        return f'<QuizAnswer Attempt:{self.attempt_id} Question:{self.question_id}>'
+

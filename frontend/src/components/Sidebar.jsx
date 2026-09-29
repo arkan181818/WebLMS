@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LogOut, Home, BookOpen, PenTool, MessageCircle, Users, Sparkles, Menu, X } from 'lucide-react';
+import { LogOut, Home, BookOpen, PenTool, MessageCircle, Users, Sparkles, Menu, X, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../lib/api';
 import { Link, useLocation } from 'react-router-dom';
@@ -51,11 +51,13 @@ export default function Sidebar({ user, onLogout }) {
     { icon: <Users size={20} />, label: 'Daftar Murid', path: '/mentees' },
     { icon: <BookOpen size={20} />, label: 'Kelola Materi', path: '/materials' },
     { icon: <PenTool size={20} />, label: 'Review Tugas', path: '/assignments' },
+    { icon: <HelpCircle size={20} />, label: 'Kuis & Ujian', path: '/quizzes' },
     { icon: <MessageCircle size={20} />, label: 'Chat 1-on-1', path: '/chat' },
   ] : [
     { icon: <Home size={20} />, label: 'Dashboard', path: '/dashboard' },
     { icon: <BookOpen size={20} />, label: 'Materi Personal', path: '/materials' },
     { icon: <PenTool size={20} />, label: 'Tugas Saya', path: '/assignments' },
+    { icon: <HelpCircle size={20} />, label: 'Kuis & Ujian', path: '/quizzes' },
     { icon: <MessageCircle size={20} />, label: 'Konsultasi Mentor', path: '/chat' },
   ];
 

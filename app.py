@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify, send_from_directory, abort
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from flask_cors import CORS
-from models import db, User, Subject, Material, MaterialProgress, MaterialAttachment, Assignment, Submission, Message
+from models import db, User, Subject, Material, MaterialProgress, MaterialAttachment, Assignment, Submission, Message, Quiz, QuizQuestion, QuizAttempt, QuizAnswer
 from database import init_db
 
 load_dotenv()
@@ -933,6 +933,675 @@ def send_message(target_id):
     db.session.commit()
     
     return jsonify({'success': True, 'message': 'Pesan terkirim.'})
+
+
+# ==========================================
+# QUIZ & EXAM API ROUTES
+# ==========================================
+
+def parse_iso_datetime(dt_str):
+    """Parse berbagai format ISO string datetime menjadi Python datetime naive."""
+    if not dt_str:
+        return None
+    try:
+        clean_str = str(dt_str).strip().replace('Z', '+00:00')
+        if '+00:00' in clean_str:
+            return datetime.fromisoformat(clean_str).replace(tzinfo=None)
+        return datetime.fromisoformat(clean_str)
+    except Exception:
+        try:
+            return datetime.strptime(str(dt_str).strip(), "%Y-%m-%dT%H:%M")
+        except Exception:
+            return None
+
+
+@app.route('/api/quizzes', methods=['GET'])
+@login_required
+def get_quizzes():
+    user = get_current_user()
+    
+    if user.role == 'guru':
+        quizzes = Quiz.query.order_by(Quiz.created_at.desc()).all()
+        result = []
+        for q in quizzes:
+            attempts = q.attempts
+            submitted_attempts = [a for a in attempts if a.status in ('submitted', 'graded')]
+            graded_attempts = [a for a in attempts if a.status == 'graded']
+            pending_grading_count = sum(1 for a in attempts if a.status == 'submitted' and q.has_essay)
+            avg_score = round(sum(a.total_score for a in graded_attempts if a.total_score is not None) / len(graded_attempts), 1) if graded_attempts else None
+            
+            result.append({
+                'id': q.id,
+                'title': q.title,
+                'description': q.description,
+                'subject_id': q.subject_id,
+                'subject_name': q.subject.name if q.subject else None,
+                'subject_color': q.subject.color if q.subject else 'blue',
+                'teacher_id': q.teacher_id,
+                'teacher_name': q.teacher.display_name if q.teacher else None,
+                'target_student_id': q.target_student_id,
+                'target_student_name': q.target_student.display_name if q.target_student else None,
+                'start_time': q.start_time.isoformat() if q.start_time else None,
+                'end_time': q.end_time.isoformat() if q.end_time else None,
+                'duration_minutes': q.duration_minutes,
+                'show_score_immediately': q.show_score_immediately,
+                'is_published': q.is_published,
+                'is_active': q.is_active,
+                'total_points': q.total_points,
+                'question_count': q.question_count,
+                'has_essay': q.has_essay,
+                'total_attempts': len(submitted_attempts),
+                'pending_grading_count': pending_grading_count,
+                'average_score': avg_score,
+                'created_at': q.created_at.isoformat()
+            })
+        return jsonify(result)
+
+    # Role Murid:
+    now = datetime.now()
+    quizzes = Quiz.query.filter(
+        Quiz.is_published == True,
+        db.or_(Quiz.target_student_id == None, Quiz.target_student_id == user.id)
+    ).order_by(Quiz.created_at.desc()).all()
+
+    result = []
+    for q in quizzes:
+        attempt = q.get_student_attempt(user.id)
+        attempt_data = None
+        if attempt:
+            # Check timeout for in_progress
+            if attempt.status == 'in_progress' and attempt.remaining_seconds == 0:
+                # Auto finalize PG if timeout
+                attempt.submitted_at = attempt.started_at + timedelta(minutes=q.duration_minutes)
+                for ans in attempt.answers:
+                    if ans.question and ans.question.question_type == 'multiple_choice':
+                        if ans.selected_option and ans.question.correct_answer and ans.selected_option.strip().upper() == ans.question.correct_answer.strip().upper():
+                            ans.earned_points = ans.question.points
+                        else:
+                            ans.earned_points = 0
+                        ans.is_graded = True
+                if not q.has_essay:
+                    attempt.calculate_score()
+                    attempt.status = 'graded'
+                    if q.show_score_immediately:
+                        attempt.is_score_released = True
+                else:
+                    attempt.status = 'submitted'
+                db.session.commit()
+
+            attempt_data = {
+                'id': attempt.id,
+                'status': attempt.status,
+                'started_at': attempt.started_at.isoformat() if attempt.started_at else None,
+                'submitted_at': attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+                'remaining_seconds': attempt.remaining_seconds,
+                'is_score_released': attempt.is_score_released,
+                'total_score': attempt.total_score if attempt.is_score_released else None
+            }
+
+        result.append({
+            'id': q.id,
+            'title': q.title,
+            'description': q.description,
+            'subject_id': q.subject_id,
+            'subject_name': q.subject.name if q.subject else None,
+            'subject_color': q.subject.color if q.subject else 'blue',
+            'teacher_name': q.teacher.display_name if q.teacher else None,
+            'start_time': q.start_time.isoformat() if q.start_time else None,
+            'end_time': q.end_time.isoformat() if q.end_time else None,
+            'duration_minutes': q.duration_minutes,
+            'show_score_immediately': q.show_score_immediately,
+            'is_active': q.is_active,
+            'total_points': q.total_points,
+            'question_count': q.question_count,
+            'has_essay': q.has_essay,
+            'attempt': attempt_data,
+            'created_at': q.created_at.isoformat()
+        })
+    return jsonify(result)
+
+
+@app.route('/api/quizzes', methods=['POST'])
+@teacher_required
+def create_quiz():
+    user = get_current_user()
+    data = request.json or {}
+    
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify({'error': 'Bad Request', 'message': 'Judul kuis wajib diisi.'}), 400
+    
+    subject_id = data.get('subject_id')
+    subject_name = data.get('subject_name', '').strip()
+    if not subject_id and subject_name:
+        subject = Subject.query.filter(db.func.lower(Subject.name) == subject_name.lower()).first()
+        if not subject:
+            subject = Subject(name=subject_name, color='indigo')
+            db.session.add(subject)
+            db.session.flush()
+        subject_id = subject.id
+
+    if not subject_id:
+        return jsonify({'error': 'Bad Request', 'message': 'Mata pelajaran/kuliah wajib diisi.'}), 400
+
+    questions_data = data.get('questions', [])
+    if not questions_data or len(questions_data) == 0:
+        return jsonify({'error': 'Bad Request', 'message': 'Kuis harus memiliki minimal 1 soal.'}), 400
+
+    start_time = parse_iso_datetime(data.get('start_time'))
+    end_time = parse_iso_datetime(data.get('end_time'))
+    duration_minutes = int(data.get('duration_minutes', 60))
+    show_score_immediately = bool(data.get('show_score_immediately', True))
+    is_published = bool(data.get('is_published', True))
+    target_student_id = data.get('target_student_id') or None
+
+    quiz = Quiz(
+        title=title,
+        description=data.get('description', '').strip(),
+        subject_id=subject_id,
+        teacher_id=user.id,
+        target_student_id=target_student_id,
+        start_time=start_time,
+        end_time=end_time,
+        duration_minutes=duration_minutes,
+        show_score_immediately=show_score_immediately,
+        is_published=is_published
+    )
+    db.session.add(quiz)
+    db.session.flush()
+
+    for idx, q_data in enumerate(questions_data):
+        q_type = q_data.get('question_type', 'multiple_choice')
+        q_text = q_data.get('question_text', '').strip()
+        points = float(q_data.get('points', 10.0))
+        
+        question = QuizQuestion(
+            quiz_id=quiz.id,
+            question_type=q_type,
+            question_text=q_text,
+            points=points,
+            order_index=idx
+        )
+        if q_type == 'multiple_choice':
+            options = q_data.get('options', [])
+            question.set_options(options)
+            question.correct_answer = q_data.get('correct_answer', '').strip().upper()
+        else:
+            question.rubric = q_data.get('rubric', '').strip()
+
+        db.session.add(question)
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Kuis berhasil dibuat!', 'quiz_id': quiz.id}), 201
+
+
+@app.route('/api/quizzes/<int:quiz_id>', methods=['GET'])
+@login_required
+def get_quiz_detail(quiz_id):
+    user = get_current_user()
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+
+    is_teacher = (user.role == 'guru')
+    attempt = quiz.get_student_attempt(user.id) if not is_teacher else None
+
+    # Status check for student: can they view answers/feedback?
+    can_view_full_result = is_teacher or (
+        attempt and attempt.is_score_released
+    ) or (
+        attempt and attempt.status == 'graded' and quiz.show_score_immediately and not quiz.has_essay
+    )
+
+    questions_list = []
+    for q in quiz.questions:
+        q_dict = {
+            'id': q.id,
+            'question_type': q.question_type,
+            'question_text': q.question_text,
+            'points': q.points,
+            'order_index': q.order_index,
+            'options': q.get_options() if q.question_type == 'multiple_choice' else []
+        }
+        if is_teacher or can_view_full_result:
+            q_dict['correct_answer'] = q.correct_answer
+            q_dict['rubric'] = q.rubric
+        
+        # If student has an attempt, attach their saved/graded answer
+        if attempt:
+            ans = QuizAnswer.query.filter_by(attempt_id=attempt.id, question_id=q.id).first()
+            if ans:
+                q_dict['student_answer'] = {
+                    'selected_option': ans.selected_option,
+                    'essay_answer': ans.essay_answer,
+                    'earned_points': ans.earned_points if can_view_full_result else None,
+                    'teacher_feedback': ans.teacher_feedback if can_view_full_result else None,
+                    'is_graded': ans.is_graded
+                }
+
+        questions_list.append(q_dict)
+
+    attempt_data = None
+    if attempt:
+        attempt_data = {
+            'id': attempt.id,
+            'status': attempt.status,
+            'started_at': attempt.started_at.isoformat() if attempt.started_at else None,
+            'submitted_at': attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+            'remaining_seconds': attempt.remaining_seconds,
+            'is_score_released': attempt.is_score_released,
+            'total_score': attempt.total_score if can_view_full_result else None
+        }
+
+    return jsonify({
+        'id': quiz.id,
+        'title': quiz.title,
+        'description': quiz.description,
+        'subject_id': quiz.subject_id,
+        'subject_name': quiz.subject.name if quiz.subject else None,
+        'subject_color': quiz.subject.color if quiz.subject else 'blue',
+        'teacher_id': quiz.teacher_id,
+        'teacher_name': quiz.teacher.display_name if quiz.teacher else None,
+        'target_student_id': quiz.target_student_id,
+        'target_student_name': quiz.target_student.display_name if quiz.target_student else None,
+        'start_time': quiz.start_time.isoformat() if quiz.start_time else None,
+        'end_time': quiz.end_time.isoformat() if quiz.end_time else None,
+        'duration_minutes': quiz.duration_minutes,
+        'show_score_immediately': quiz.show_score_immediately,
+        'is_published': quiz.is_published,
+        'is_active': quiz.is_active,
+        'total_points': quiz.total_points,
+        'question_count': quiz.question_count,
+        'has_essay': quiz.has_essay,
+        'questions': questions_list,
+        'attempt': attempt_data
+    })
+
+
+@app.route('/api/quizzes/<int:quiz_id>', methods=['PUT'])
+@teacher_required
+def update_quiz(quiz_id):
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+
+    data = request.json or {}
+    quiz.title = data.get('title', quiz.title).strip()
+    quiz.description = data.get('description', quiz.description).strip()
+    quiz.subject_id = data.get('subject_id', quiz.subject_id)
+    quiz.target_student_id = data.get('target_student_id') or None
+    quiz.start_time = parse_iso_datetime(data.get('start_time'))
+    quiz.end_time = parse_iso_datetime(data.get('end_time'))
+    quiz.duration_minutes = int(data.get('duration_minutes', quiz.duration_minutes))
+    quiz.show_score_immediately = bool(data.get('show_score_immediately', quiz.show_score_immediately))
+    quiz.is_published = bool(data.get('is_published', quiz.is_published))
+    quiz.updated_at = datetime.now()
+
+    # If questions list provided, update or recreate
+    if 'questions' in data:
+        # Delete old questions if no attempts or update them
+        # If attempts already exist, update existing questions or replace carefully
+        QuizQuestion.query.filter_by(quiz_id=quiz.id).delete()
+        for idx, q_data in enumerate(data['questions']):
+            q_type = q_data.get('question_type', 'multiple_choice')
+            question = QuizQuestion(
+                quiz_id=quiz.id,
+                question_type=q_type,
+                question_text=q_data.get('question_text', '').strip(),
+                points=float(q_data.get('points', 10.0)),
+                order_index=idx
+            )
+            if q_type == 'multiple_choice':
+                question.set_options(q_data.get('options', []))
+                question.correct_answer = q_data.get('correct_answer', '').strip().upper()
+            else:
+                question.rubric = q_data.get('rubric', '').strip()
+            db.session.add(question)
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Kuis berhasil diperbarui!'})
+
+
+@app.route('/api/quizzes/<int:quiz_id>', methods=['DELETE'])
+@teacher_required
+def delete_quiz(quiz_id):
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+    
+    db.session.delete(quiz)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Kuis berhasil dihapus.'})
+
+
+@app.route('/api/quizzes/<int:quiz_id>/start', methods=['POST'])
+@login_required
+def start_quiz(quiz_id):
+    user = get_current_user()
+    if user.role != 'murid':
+        return jsonify({'error': 'Forbidden', 'message': 'Hanya murid yang dapat mengerjakan kuis.'}), 403
+
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+
+    now = datetime.now()
+    if quiz.start_time and now < quiz.start_time:
+        return jsonify({'error': 'Forbidden', 'message': f'Kuis belum dimulai. Dibuka pada {quiz.start_time.strftime("%d %b %Y %H:%M")}.'}), 400
+
+    if quiz.end_time and now > quiz.end_time:
+        return jsonify({'error': 'Forbidden', 'message': 'Kuis sudah melewati batas waktu pengerjaan.'}), 400
+
+    attempt = quiz.get_student_attempt(user.id)
+    if attempt:
+        if attempt.status in ('submitted', 'graded'):
+            return jsonify({'error': 'Forbidden', 'message': 'Anda sudah menyelesaikan kuis ini.'}), 400
+        
+        # Resume in_progress attempt
+        if attempt.remaining_seconds == 0:
+            # Timed out, finalize
+            attempt.submitted_at = datetime.now()
+            attempt.status = 'submitted'
+            db.session.commit()
+            return jsonify({'error': 'Timeout', 'message': 'Waktu pengerjaan kuis Anda telah habis.'}), 400
+    else:
+        # Create new attempt
+        attempt = QuizAttempt(
+            quiz_id=quiz.id,
+            student_id=user.id,
+            started_at=datetime.now(),
+            status='in_progress',
+            is_score_released=False
+        )
+        db.session.add(attempt)
+        db.session.flush()
+
+        # Pre-populate empty QuizAnswer entries
+        for q in quiz.questions:
+            ans = QuizAnswer(
+                attempt_id=attempt.id,
+                question_id=q.id,
+                selected_option=None,
+                essay_answer=None,
+                is_graded=False
+            )
+            db.session.add(ans)
+        
+        db.session.commit()
+
+    # Load questions and current saved answers for student
+    saved_answers = {ans.question_id: {'selected_option': ans.selected_option, 'essay_answer': ans.essay_answer} for ans in attempt.answers}
+
+    questions_list = [{
+        'id': q.id,
+        'question_type': q.question_type,
+        'question_text': q.question_text,
+        'points': q.points,
+        'order_index': q.order_index,
+        'options': q.get_options() if q.question_type == 'multiple_choice' else [],
+        'saved_answer': saved_answers.get(q.id, {'selected_option': None, 'essay_answer': None})
+    } for q in quiz.questions]
+
+    return jsonify({
+        'success': True,
+        'attempt_id': attempt.id,
+        'started_at': attempt.started_at.isoformat(),
+        'remaining_seconds': attempt.remaining_seconds,
+        'duration_minutes': quiz.duration_minutes,
+        'questions': questions_list
+    })
+
+
+@app.route('/api/quizzes/<int:quiz_id>/save-answer', methods=['POST'])
+@login_required
+def save_quiz_answer(quiz_id):
+    user = get_current_user()
+    attempt = QuizAttempt.query.filter_by(quiz_id=quiz_id, student_id=user.id, status='in_progress').first()
+    if not attempt:
+        return jsonify({'error': 'Bad Request', 'message': 'Sesi kuis tidak aktif.'}), 400
+
+    if attempt.remaining_seconds == 0:
+        return jsonify({'error': 'Timeout', 'message': 'Waktu pengerjaan telah habis.'}), 400
+
+    data = request.json or {}
+    question_id = data.get('question_id')
+    if not question_id:
+        return jsonify({'error': 'Bad Request', 'message': 'ID soal diperlukan.'}), 400
+
+    answer = QuizAnswer.query.filter_by(attempt_id=attempt.id, question_id=question_id).first()
+    if not answer:
+        answer = QuizAnswer(attempt_id=attempt.id, question_id=question_id)
+        db.session.add(answer)
+
+    if 'selected_option' in data:
+        answer.selected_option = data['selected_option']
+    if 'essay_answer' in data:
+        answer.essay_answer = data['essay_answer']
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/quizzes/<int:quiz_id>/submit', methods=['POST'])
+@login_required
+def submit_quiz(quiz_id):
+    user = get_current_user()
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+
+    attempt = QuizAttempt.query.filter_by(quiz_id=quiz_id, student_id=user.id).first()
+    if not attempt:
+        return jsonify({'error': 'Bad Request', 'message': 'Sesi kuis tidak ditemukan.'}), 400
+
+    if attempt.status in ('submitted', 'graded'):
+        return jsonify({'success': True, 'message': 'Kuis sudah pernah disubmit.', 'total_score': attempt.total_score if attempt.is_score_released else None})
+
+    data = request.json or {}
+    batch_answers = data.get('answers', [])
+    for item in batch_answers:
+        q_id = item.get('question_id')
+        if not q_id:
+            continue
+        ans = QuizAnswer.query.filter_by(attempt_id=attempt.id, question_id=q_id).first()
+        if not ans:
+            ans = QuizAnswer(attempt_id=attempt.id, question_id=q_id)
+            db.session.add(ans)
+        if 'selected_option' in item:
+            ans.selected_option = item['selected_option']
+        if 'essay_answer' in item:
+            ans.essay_answer = item['essay_answer']
+
+    db.session.flush()
+
+    # Auto-grade Multiple Choice questions
+    for ans in attempt.answers:
+        question = ans.question
+        if not question:
+            continue
+        if question.question_type == 'multiple_choice':
+            if ans.selected_option and question.correct_answer and ans.selected_option.strip().upper() == question.correct_answer.strip().upper():
+                ans.earned_points = question.points
+            else:
+                ans.earned_points = 0.0
+            ans.is_graded = True
+        else:
+            ans.is_graded = False
+            ans.earned_points = None
+
+    attempt.submitted_at = datetime.now()
+
+    if not quiz.has_essay:
+        # All questions are PG, auto calculate score
+        attempt.calculate_score()
+        attempt.status = 'graded'
+        if quiz.show_score_immediately:
+            attempt.is_score_released = True
+        else:
+            attempt.is_score_released = False
+    else:
+        # Has essay, requires teacher grading
+        attempt.status = 'submitted'
+        attempt.is_score_released = False
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Kuis berhasil disubmit!',
+        'status': attempt.status,
+        'is_score_released': attempt.is_score_released,
+        'total_score': attempt.total_score if attempt.is_score_released else None,
+        'show_score_immediately': quiz.show_score_immediately
+    })
+
+
+@app.route('/api/quizzes/<int:quiz_id>/attempts', methods=['GET'])
+@teacher_required
+def get_quiz_attempts(quiz_id):
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+
+    attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).all()
+    result = []
+    for a in attempts:
+        student = a.student
+        essay_pending = sum(1 for ans in a.answers if ans.question and ans.question.question_type == 'essay' and not ans.is_graded)
+        result.append({
+            'id': a.id,
+            'student_id': a.student_id,
+            'student_name': student.display_name if student else 'Unknown',
+            'student_email': student.email if student else '',
+            'student_department': student.department if student else '',
+            'student_campus': student.campus if student else '',
+            'started_at': a.started_at.isoformat() if a.started_at else None,
+            'submitted_at': a.submitted_at.isoformat() if a.submitted_at else None,
+            'total_score': a.total_score,
+            'status': a.status,
+            'is_score_released': a.is_score_released,
+            'essay_pending_count': essay_pending
+        })
+
+    return jsonify({
+        'quiz_id': quiz.id,
+        'quiz_title': quiz.title,
+        'has_essay': quiz.has_essay,
+        'total_points': quiz.total_points,
+        'attempts': result
+    })
+
+
+@app.route('/api/quizzes/<int:quiz_id>/attempts/<int:attempt_id>', methods=['GET'])
+@login_required
+def get_attempt_detail(quiz_id, attempt_id):
+    user = get_current_user()
+    attempt = db.session.get(QuizAttempt, attempt_id)
+    if not attempt or attempt.quiz_id != quiz_id:
+        return jsonify({'error': 'Not Found', 'message': 'Data pengerjaan tidak ditemukan.'}), 404
+
+    is_teacher = (user.role == 'guru')
+    if not is_teacher and attempt.student_id != user.id:
+        return jsonify({'error': 'Forbidden', 'message': 'Akses ditolak.'}), 403
+
+    quiz = attempt.quiz
+    answers_data = []
+    for ans in attempt.answers:
+        q = ans.question
+        if not q:
+            continue
+        answers_data.append({
+            'question_id': q.id,
+            'question_type': q.question_type,
+            'question_text': q.question_text,
+            'points': q.points,
+            'order_index': q.order_index,
+            'options': q.get_options() if q.question_type == 'multiple_choice' else [],
+            'correct_answer': q.correct_answer if (is_teacher or attempt.is_score_released) else None,
+            'rubric': q.rubric if is_teacher else None,
+            'selected_option': ans.selected_option,
+            'essay_answer': ans.essay_answer,
+            'earned_points': ans.earned_points if (is_teacher or attempt.is_score_released) else None,
+            'teacher_feedback': ans.teacher_feedback if (is_teacher or attempt.is_score_released) else None,
+            'is_graded': ans.is_graded
+        })
+
+    # Sort by order_index
+    answers_data.sort(key=lambda x: x['order_index'])
+
+    return jsonify({
+        'attempt_id': attempt.id,
+        'student_name': attempt.student.display_name if attempt.student else 'Unknown',
+        'started_at': attempt.started_at.isoformat() if attempt.started_at else None,
+        'submitted_at': attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+        'total_score': attempt.total_score if (is_teacher or attempt.is_score_released) else None,
+        'status': attempt.status,
+        'is_score_released': attempt.is_score_released,
+        'quiz_title': quiz.title,
+        'quiz_duration': quiz.duration_minutes,
+        'answers': answers_data
+    })
+
+
+@app.route('/api/quizzes/attempts/<int:attempt_id>/grade', methods=['POST'])
+@teacher_required
+def grade_attempt(attempt_id):
+    attempt = db.session.get(QuizAttempt, attempt_id)
+    if not attempt:
+        return jsonify({'error': 'Not Found', 'message': 'Pengerjaan tidak ditemukan.'}), 404
+
+    data = request.json or {}
+    grades = data.get('grades', [])
+    release_score = bool(data.get('release_score', False))
+
+    for g in grades:
+        q_id = g.get('question_id')
+        ans = QuizAnswer.query.filter_by(attempt_id=attempt.id, question_id=q_id).first()
+        if ans:
+            if 'earned_points' in g and g['earned_points'] is not None:
+                ans.earned_points = float(g['earned_points'])
+                ans.is_graded = True
+            if 'teacher_feedback' in g:
+                ans.teacher_feedback = g['teacher_feedback']
+
+    # Recalculate total score
+    attempt.calculate_score()
+    
+    # Check if all questions are graded
+    all_graded = all(ans.is_graded for ans in attempt.answers)
+    if all_graded:
+        attempt.status = 'graded'
+
+    if release_score:
+        attempt.is_score_released = True
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'Penilaian berhasil disimpan!',
+        'total_score': attempt.total_score,
+        'status': attempt.status,
+        'is_score_released': attempt.is_score_released
+    })
+
+
+@app.route('/api/quizzes/<int:quiz_id>/release-scores', methods=['POST'])
+@teacher_required
+def release_quiz_scores(quiz_id):
+    quiz = db.session.get(Quiz, quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Not Found', 'message': 'Kuis tidak ditemukan.'}), 404
+
+    attempts = QuizAttempt.query.filter_by(quiz_id=quiz.id).all()
+    count = 0
+    for a in attempts:
+        if a.status in ('submitted', 'graded'):
+            a.is_score_released = True
+            count += 1
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'Nilai berhasil dirilis untuk {count} peserta!'})
+
 
 init_db(app)
 

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text
-from models import db, User, Subject, Material, MaterialAttachment, MaterialProgress, Assignment, Submission, Message
+from models import db, User, Subject, Material, MaterialAttachment, MaterialProgress, Assignment, Submission, Message, Quiz, QuizQuestion, QuizAttempt, QuizAnswer
 
 def init_db(app):
     db.init_app(app)

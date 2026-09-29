@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Mentees from './pages/Mentees';
 import Materials from './pages/Materials';
 import Assignments from './pages/Assignments';
+import Quizzes from './pages/Quizzes';
 import Chat from './pages/Chat';
 
 function App() {
@@ -68,6 +69,7 @@ function App() {
         <Route path="/mentees" element={user && user.role === 'guru' ? <Mentees user={user} onLogout={checkAuth} /> : <Navigate to="/dashboard" />} />
         <Route path="/materials" element={user ? <Materials user={user} onLogout={checkAuth} /> : <Navigate to="/login" />} />
         <Route path="/assignments" element={user ? <Assignments user={user} onLogout={checkAuth} /> : <Navigate to="/login" />} />
+        <Route path="/quizzes" element={user ? <Quizzes user={user} onLogout={checkAuth} /> : <Navigate to="/login" />} />
         <Route path="/chat" element={user ? <Chat user={user} onLogout={checkAuth} /> : <Navigate to="/login" />} />
       </Routes>
     </>
